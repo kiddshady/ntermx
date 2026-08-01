@@ -1,0 +1,100 @@
+/* Neon Terminal — neon design tokens (estilo Console / cyberpunk).
+   Dark, high-contrast, two-voiced: cyan accent + magenta alt. */
+
+:root {
+  /* ── identity ── */
+  --st-accent:     #00fff5;   /* cyan — brand/primary/focus/activity */
+  --st-accent-alt: #ff00aa;   /* magenta — the alternate voice */
+
+  /* ── status ── */
+  --st-danger:  #ff0044;
+  --st-success: #00ff88;
+  --st-warning: #ffee00;
+  --st-highlight: var(--st-warning);
+
+  /* ── syntax ── */
+  --st-syntax-keyword: #aa00ff;
+  --st-syntax-fn:      var(--st-accent);
+
+  /* ── surfaces (elevation ladder carved DOWN into --st-bg-deep) ── */
+  --st-bg-deep:     #050507;   /* titlebar, status bar */
+  --st-bg:          #0a0a0f;   /* app body / terminal base */
+  --st-bg-panel:    #0f0f17;   /* panels and rails */
+  --st-bg-elevated: #14141f;   /* dropdowns, toasts */
+
+  --st-bg-hover:  #1a1a28;
+  --st-bg-active: #20203a;
+  --st-bg-input:  var(--st-bg);
+
+  /* the one neutral edge in the system */
+  --st-edge: #20203a;
+
+  /* ── text — four steps, neutrals carry a violet cast ── */
+  --st-text:       #e0e0f0;
+  --st-text-dim:   #8888aa;
+  --st-text-faint: #555577;
+  --st-text-ghost: #33334a;
+
+  /* what sits on top of a filled accent / danger surface */
+  --st-on-accent: var(--st-bg-deep);
+  --st-on-danger: #ffffff;
+
+  /* ── type — the machine speaks mono, the human reads sans ── */
+  --st-mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', ui-monospace, 'SF Mono', Menlo, monospace;
+  --st-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* micro-labels are uppercase mono with the tracking opened up */
+  --st-track-label: 0.16em;
+  --st-track-title: 0.06em;
+  --st-track-brand: 0.34em;
+
+  /* ── metrics ── */
+  --st-titlebar-h:  38px;
+  --st-statusbar-h: 26px;
+
+  --st-radius-sm: 4px;
+  --st-radius-md: 6px;
+  --st-radius-lg: 8px;
+  --st-radius-xl: 10px;
+
+  /* the 2px left rail that carries status on bubbles, chips, toasts */
+  --st-rail: 2px;
+
+  /* ── depth ── */
+  --st-shadow-pop:   0 2px 10px rgba(0, 0, 0, 0.35);
+  --st-shadow-float: 0 14px 36px rgba(0, 0, 0, 0.55);
+
+  /* ── motion ── */
+  --st-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --st-ease-in:  cubic-bezier(0.4, 0, 0.6, 1);
+
+  --st-dur-1: 0.12s;
+  --st-dur-2: 0.15s;
+  --st-dur-3: 0.18s;
+  --st-dur-4: 0.22s;
+  --st-dur-5: 0.28s;
+
+  /* the ambient voice; regions override this and re-derive (below) */
+  --st-tint: var(--st-accent);
+}
+
+:root {
+  --st-border-subtle: color-mix(in srgb, var(--st-tint) 7%,  transparent);
+  --st-border-soft:   color-mix(in srgb, var(--st-tint) 12%, transparent);
+  --st-border-strong: color-mix(in srgb, var(--st-tint) 28%, transparent);
+  --st-border-vivid:  color-mix(in srgb, var(--st-tint) 40%, transparent);
+
+  --st-wash: color-mix(in srgb, var(--st-tint) 6%, transparent);
+
+  --st-glow-sm:   0 0 8px  color-mix(in srgb, var(--st-tint) 35%, transparent);
+  --st-glow:      0 0 12px color-mix(in srgb, var(--st-tint) 30%, transparent);
+  --st-glow-lg:   0 0 20px color-mix(in srgb, var(--st-tint) 50%, transparent);
+  --st-glow-text: 0 0 10px color-mix(in srgb, var(--st-tint) 45%, transparent);
+  --st-glow-icon: drop-shadow(0 0 6px color-mix(in srgb, var(--st-tint) 50%, transparent));
+
+  --st-halo:      0 0 22px color-mix(in srgb, var(--st-tint) 14%, transparent);
+  --st-halo-wide: 0 0 40px color-mix(in srgb, var(--st-tint) 8%,  transparent);
+
+  --st-selection: color-mix(in srgb, var(--st-tint) 22%, transparent);
+  --st-grid-line: color-mix(in srgb, var(--st-tint) 3%,  transparent);
+}
