@@ -13,6 +13,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const pty = require('node-pty');
+const { execFileSync } = require('child_process');
 
 /** @type {import('electron').BrowserWindow | null} */
 let mainWindow = null;
@@ -237,9 +238,87 @@ ipcMain.on('window:close', () => {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close();
 });
 
+// ---------------------------------------------------------------------------
+// Restos de una instancia anterior
+// ---------------------------------------------------------------------------
+// Una salida sucia —un cierre que no termina de irse, un crash a mitad del quit— deja un
+// proceso huérfano. Su ventana ya no renderiza, pero Windows la sigue componiendo, lavada,
+// por debajo de la nueva: abrir la app se ve como un pestañeo gris. No es un problema de
+// pintado, el layout ya está entero; lo único que se mueve es el alfa.
+//
+// Registramos el PID de cada main que arranca y el siguiente mata al anterior si sigue
+// vivo. El registro NO se borra al salir, a propósito: si el proceso se fue de verdad la
+// consulta falla sola y no cuesta un spawn; si quedó colgado, es justo lo que buscamos.
+//
+// Corre sólo después de ganar el lock de instancia única, así que cualquier otro proceso
+// nuestro que siga vivo es por definición un resto. Si el colgado fuera el que RETIENE el
+// lock, esta instancia ni arranca: ese caso queda afuera a propósito, porque matar a quien
+// tiene el lock es exactamente lo que el lock existe para evitar.
+
+const instanceRecordPath = () => path.join(app.getPath('userData'), 'instance.json');
+
+/** Mata el main de la corrida anterior si quedó colgado. */
+function killLeftoverInstance() {
+  let rec;
+  try { rec = JSON.parse(fs.readFileSync(instanceRecordPath(), 'utf8')); } catch { return; }
+  if (!rec || !Number.isInteger(rec.pid) || rec.pid === process.pid) return;
+
+  // ¿sigue vivo? kill(pid, 0) no manda ninguna señal, sólo consulta. ESRCH = ya no existe
+  // (el camino normal, y sale gratis). EPERM significa que existe pero no lo podemos
+  // señalizar, así que seguimos: taskkill /F puede llegar igual.
+  try { process.kill(rec.pid, 0); }
+  catch (err) { if (err.code !== 'EPERM') return; }
+
+  // Vivo. Puede ser el colgado… o un PID reciclado por un proceso ajeno, así que antes de
+  // matar nada confirmamos que la ruta del ejecutable es la nuestra.
+  let exe;
+  try {
+    exe = execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command',
+      `(Get-CimInstance Win32_Process -Filter "ProcessId=${rec.pid}").ExecutablePath`],
+      { encoding: 'utf8', timeout: 5000, windowsHide: true }).trim();
+  } catch (err) {
+    console.error(`[NEON] no pude verificar el PID ${rec.pid}:`, err.message);
+    return;
+  }
+  const samePath = (a, b) => path.normalize(a).toLowerCase() === path.normalize(b).toLowerCase();
+  if (!exe || !samePath(exe, process.execPath)) return;   // no es nuestro: no se toca
+
+  // /T se lleva también los helpers (renderer, GPU, utility): no mueren solos si el main
+  // quedó colgado, y son los que retienen la superficie que Windows sigue componiendo.
+  try {
+    execFileSync('taskkill', ['/PID', String(rec.pid), '/T', '/F'],
+      { timeout: 5000, windowsHide: true, stdio: 'ignore' });
+    console.log(`[NEON] resto de una instancia anterior (PID ${rec.pid}) eliminado`);
+  } catch (err) {
+    console.error(`[NEON] no pude eliminar el PID ${rec.pid}:`, err.message);
+  }
+}
+
+/** Deja registrado nuestro PID para que la próxima corrida sepa a quién mirar. */
+function recordInstance() {
+  try {
+    fs.writeFileSync(instanceRecordPath(),
+      JSON.stringify({ pid: process.pid, version: app.getVersion() }), 'utf8');
+  } catch (err) {
+    console.error('[NEON] no pude registrar el PID de la instancia:', err.message);
+  }
+}
+
 // ---- Ciclo de vida ----
 
 app.whenReady().then(() => {
+  // La instancia que pierde el lock ya llamó a app.quit() allá arriba, pero quit() es
+  // asíncrono y whenReady llega igual: verificado, la segunda instancia alcanzaba a crear
+  // ventana, tray y hotkeys antes de irse. Eso es el pestañeo al abrir la app estando ya
+  // corriendo — dos ventanas por un instante, uno que se muere enseguida. Y sin este corte
+  // killLeftoverInstance mataría el PID registrado, que es el de la instancia legítima.
+  if (!gotTheLock) return;
+
+  // Si quedó una huérfana de la corrida anterior, que se vaya antes de crear la ventana,
+  // para que no lleguen a convivir en pantalla.
+  killLeftoverInstance();
+  recordInstance();
+
   createWindow();
   createTray();
   registerHotkeys();
