@@ -322,7 +322,7 @@ html, body {
   font-weight: 600;
 }
 
-/* ========== CURSOR GLOW (WebGL draws cursor on canvas, so glow via DOM) ========== */
+/* ========== CURSOR GLOW (div propio que sigue al cursor; ver attachGlow) ========== */
 .cursor-glow {
   position: absolute;
   pointer-events: none;

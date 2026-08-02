@@ -1,6 +1,6 @@
 // Neon Terminal — renderer: xterm.js con tabs (una pty por tab) + cursor glow.
 // Globals de los bundles UMD cargados en index.html:
-//   window.Terminal, window.FitAddon, window.WebLinksAddon, window.WebglAddon
+//   window.Terminal, window.FitAddon, window.WebLinksAddon
 
 const MAX_TABS = 8;
 
@@ -96,14 +96,17 @@ function createTab() {
   };
   state.tabs.push(tab);
 
+  // Renderer DOM a propósito, NO WebGL. El renderer WebGL rasteriza cada glifo a un
+  // atlas de texturas y ahí rompe las ITÁLICAS: al glifo inclinado le come la parte de
+  // arriba, así que las letras que son puro cuerpo bajo (i, o) quedan chicas y pegadas
+  // a la línea de base — se leen como subíndices. Se nota en la sombra del
+  // autocompletado de PSReadLine, que llega como ESC[97;2;3m (el 3 es itálica).
+  // No es la fuente: en HTML puro la misma cara itálica se dibuja perfecta, y las
+  // métricas de la itálica son idénticas a las de la romana. Tampoco lo arreglan el
+  // peso, letterSpacing, lineHeight, allowTransparency ni subir a xterm 6 + webgl 0.19.
+  // El renderer DOM no pasa por el atlas: la itálica sale bien y además el texto gana
+  // antialiasing subpixel. Se paga con el dibujado por GPU.
   term.open(el);
-  try {
-    const webgl = new WebglAddon.WebglAddon();
-    webgl.onContextLoss(() => { try { webgl.dispose(); } catch { /* noop */ } });
-    term.loadAddon(webgl);
-  } catch (e) {
-    console.warn('[NEON] WebGL no disponible, uso el renderer DOM:', e && e.message);
-  }
 
   setActiveTab(id);   // activa (y hace visible) antes de medir
   fitTab(tab);
@@ -254,8 +257,9 @@ function remeasure(tab) {
 // Cursor glow
 // ===========================================================================
 /**
- * Un div sigue al cursor y le pone el halo cyan (WebGL dibuja el cursor en canvas, sin
- * nodo DOM que pueda llevar el box-shadow).
+ * Un div sigue al cursor y le pone el halo cyan. Va aparte del cursor que dibuja xterm
+ * en vez de ser un box-shadow sobre él: así el halo se posiciona por coordenadas de
+ * celda y no depende de cómo el renderer de turno materialice el cursor.
  *
  * Lo delicado es CUÁNDO mostrarlo: el halo no puede quedar flotando sin el bloque
  * adentro. Se oculta si (a) la shell todavía no escribió nada, (b) el cursor está en el
