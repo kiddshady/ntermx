@@ -66,7 +66,13 @@ function createTab() {
   const term = new Terminal({
     fontFamily: "'JetBrains Mono', 'Cascadia Code', monospace",
     fontSize: 14,
-    lineHeight: 1.2,
+    // lineHeight 1 (no 1.2) porque con el renderer DOM la celda ES la caja del glifo:
+    // un ▀ o un █ llenan su em box y nada más, así que todo lo que la celda mida de más
+    // queda como banda muerta ENTRE filas y parte al medio cualquier arte de bloques
+    // (el logo de Claude Code, las barras de progreso, los marcos de las TUIs). Con
+    // WebGL esto no pasaba: el addon estira el path del glifo a la celda, mida lo que
+    // mida. En 1 los bloques tilean sin costura y las verticales de los marcos se tocan.
+    lineHeight: 1,
     fontWeight: 500,
     fontWeightBold: 700,
     theme: NEON_THEME,
@@ -106,6 +112,15 @@ function createTab() {
   // peso, letterSpacing, lineHeight, allowTransparency ni subir a xterm 6 + webgl 0.19.
   // El renderer DOM no pasa por el atlas: la itálica sale bien y además el texto gana
   // antialiasing subpixel. Se paga con el dibujado por GPU.
+  //
+  // Y con una segunda cosa, menos obvia: el addon WebGL es el que trae tryDrawCustomChar
+  // + box/block/powerlineDefinitions, o sea el que DIBUJA ─ │ ╭ █ ░ como paths propios
+  // calzados a la celda. El core (renderer DOM) no tiene nada de eso: mete el carácter
+  // en un span y deja elegir fuente a Chromium. Por eso acá la fuente tiene que cubrir
+  // esos rangos sí o sí — ver la nota larga en fonts.css. Lo único que JetBrains Mono
+  // NO trae es braille (U+2800–28FF), que algunos spinners de CLI usan: eso sigue
+  // cayendo a Cascadia Code. Es 1 carácter suelto, no arte conectado, así que no se
+  // despega; si algún día molesta, la salida es volver a WebGL, no cambiar de fuente.
   term.open(el);
 
   setActiveTab(id);   // activa (y hace visible) antes de medir

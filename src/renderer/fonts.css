@@ -1,11 +1,23 @@
-/* Console — fuentes vendoreadas (bundle local).
+/* Konsol — fuentes vendoreadas (bundle local).
    Antes venían de Google Fonts (remoto), lo que causaba dos problemas: (1) la app
    dependía de la red para tener su tipografía, y (2) un race al arrancar — la shell 1
    se creaba y xterm medía su glyph con la fuente fallback (Cascadia Code) ANTES de que
    bajara JetBrains Mono, dejando el prompt/cursor unos px corrido respecto del resto de
    las shells. Ahora las caras están acá al lado (y disponibles offline); el renderer
    además espera document.fonts antes de crear la primera shell y re-mide si hiciera falta.
-   Licencias: fonts/OFL-JetBrainsMono.txt y fonts/OFL-Inter.txt (ambas SIL OFL 1.1). */
+   Licencias: fonts/OFL-JetBrainsMono.txt y fonts/OFL-Inter.txt (ambas SIL OFL 1.1).
+
+   La mono va en TTF COMPLETA, no en el .woff2 de Google Fonts. GF sirve la cara
+   subseteada al rango `latin`: su cmap termina en U+FEFF y NO trae box drawing
+   (U+2500–257F) ni block elements (U+2580–259F). Con el renderer WebGL eso daba igual
+   —el addon dibuja esos glifos él mismo, como paths calzados a la celda— pero el
+   renderer DOM no: mete el carácter en un span y deja elegir fuente a Chromium. Con el
+   subset, cada ─ │ ╭ █ ░ de una TUI se caía a Cascadia Code (0.5859 em contra los
+   0.6 em con los que xterm midió la celda), y los marcos salían despegados. La TTF de
+   arriba cubre los 2610 rangos, así que no hay fallback y la métrica es una sola.
+   Pesa ~275 KB por cara en vez de ~21 KB: irrelevante leyendo de disco, no de la red.
+   Se verifica con: node scripts/font-coverage.js src/renderer/fonts/*.ttf
+   Lo único que la cara NO trae es braille (U+2800–28FF) — ver nota en renderer.js. */
 
 /* ── JetBrains Mono — la voz de la máquina (terminal + mono de la UI) ── */
 @font-face {
@@ -13,35 +25,35 @@
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url('fonts/jetbrains-mono-400.woff2') format('woff2');
+  src: url('fonts/jetbrains-mono-400.ttf') format('truetype');
 }
 @font-face {
   font-family: 'JetBrains Mono';
   font-style: normal;
   font-weight: 500;
   font-display: swap;
-  src: url('fonts/jetbrains-mono-500.woff2') format('woff2');
+  src: url('fonts/jetbrains-mono-500.ttf') format('truetype');
 }
 @font-face {
   font-family: 'JetBrains Mono';
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url('fonts/jetbrains-mono-600.woff2') format('woff2');
+  src: url('fonts/jetbrains-mono-600.ttf') format('truetype');
 }
 @font-face {
   font-family: 'JetBrains Mono';
   font-style: normal;
   font-weight: 700;
   font-display: swap;
-  src: url('fonts/jetbrains-mono-700.woff2') format('woff2');
+  src: url('fonts/jetbrains-mono-700.ttf') format('truetype');
 }
 @font-face {
   font-family: 'JetBrains Mono';
   font-style: italic;
   font-weight: 400;
   font-display: swap;
-  src: url('fonts/jetbrains-mono-400-italic.woff2') format('woff2');
+  src: url('fonts/jetbrains-mono-400-italic.ttf') format('truetype');
 }
 
 /* ── Inter — la voz del humano (sans de la UI) ── */
