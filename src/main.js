@@ -76,7 +76,7 @@ function resolveInitScript() {
     fs.writeFileSync(dest, content, 'utf8');
     initScriptPath = dest;
   } catch (err) {
-    console.error('[NEON] no pude preparar el init de shell:', err.message);
+    console.error('[KONSOL] no pude preparar el init de shell:', err.message);
     initScriptPath = null;
   }
   return initScriptPath;
@@ -129,7 +129,7 @@ function createWindow() {
     height: 626,
     minWidth: 520,
     minHeight: 360,
-    title: 'Neon Terminal',
+    title: 'Konsol',
     backgroundColor: '#050507', // con Electron 40 esto tiñe el frame fantasma del compositor
     titleBarStyle: 'hidden',
     frame: false,
@@ -170,16 +170,16 @@ function createWindow() {
 // Tray
 // ---------------------------------------------------------------------------
 function createTray() {
-  const iconPath = path.join(__dirname, 'neon-tray.ico');
+  const iconPath = path.join(__dirname, 'konsol-tray.ico');
   if (!fs.existsSync(iconPath)) {
-    console.error('[NEON] falta el ícono del tray:', iconPath);
+    console.error('[KONSOL] falta el ícono del tray:', iconPath);
     return;
   }
   tray = new Tray(nativeImage.createFromPath(iconPath));
 
-  tray.setToolTip('Neon Terminal');
+  tray.setToolTip('Konsol');
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Mostrar Neon Terminal', click: revealWindow },
+    { label: 'Mostrar Konsol', click: revealWindow },
     { type: 'separator' },
     { label: 'Salir', click: () => { isQuitting = true; app.quit(); } }
   ]));
@@ -203,7 +203,7 @@ function toggleWindow() {
 function registerHotkeys() {
   const ok = globalShortcut.register('CommandOrControl+Alt+T', toggleWindow);
   if (!ok) {
-    console.error('[NEON] no pude registrar Ctrl+Alt+T (¿lo tiene tomado otra app?)');
+    console.error('[KONSOL] no pude registrar Ctrl+Alt+T (¿lo tiene tomado otra app?)');
   }
 }
 
@@ -277,7 +277,7 @@ function killLeftoverInstance() {
       `(Get-CimInstance Win32_Process -Filter "ProcessId=${rec.pid}").ExecutablePath`],
       { encoding: 'utf8', timeout: 5000, windowsHide: true }).trim();
   } catch (err) {
-    console.error(`[NEON] no pude verificar el PID ${rec.pid}:`, err.message);
+    console.error(`[KONSOL] no pude verificar el PID ${rec.pid}:`, err.message);
     return;
   }
   const samePath = (a, b) => path.normalize(a).toLowerCase() === path.normalize(b).toLowerCase();
@@ -288,9 +288,9 @@ function killLeftoverInstance() {
   try {
     execFileSync('taskkill', ['/PID', String(rec.pid), '/T', '/F'],
       { timeout: 5000, windowsHide: true, stdio: 'ignore' });
-    console.log(`[NEON] resto de una instancia anterior (PID ${rec.pid}) eliminado`);
+    console.log(`[KONSOL] resto de una instancia anterior (PID ${rec.pid}) eliminado`);
   } catch (err) {
-    console.error(`[NEON] no pude eliminar el PID ${rec.pid}:`, err.message);
+    console.error(`[KONSOL] no pude eliminar el PID ${rec.pid}:`, err.message);
   }
 }
 
@@ -300,7 +300,7 @@ function recordInstance() {
     fs.writeFileSync(instanceRecordPath(),
       JSON.stringify({ pid: process.pid, version: app.getVersion() }), 'utf8');
   } catch (err) {
-    console.error('[NEON] no pude registrar el PID de la instancia:', err.message);
+    console.error('[KONSOL] no pude registrar el PID de la instancia:', err.message);
   }
 }
 

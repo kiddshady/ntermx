@@ -1,8 +1,8 @@
 {
-  "name": "neon_terminal",
-  "productName": "Neon Terminal",
+  "name": "konsol",
+  "productName": "Konsol",
   "version": "0.1.1",
-  "description": "Neon Terminal — PowerShell con estética cyberpunk",
+  "description": "Konsol — PowerShell con estética cyberpunk",
   "main": "src/main.js",
   "author": "francisco",
   "license": "MIT",
@@ -14,8 +14,8 @@
     "postinstall": "node scripts/fix-node-pty-spectre.js && electron-builder install-app-deps"
   },
   "build": {
-    "appId": "com.umbrovex.neonterminal",
-    "productName": "Neon Terminal",
+    "appId": "com.umbrovex.konsol",
+    "productName": "Konsol",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -43,10 +43,10 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Neon Terminal"
+      "shortcutName": "Konsol"
     },
     "portable": {
-      "artifactName": "Neon Terminal-${version}-portable.exe"
+      "artifactName": "Konsol-${version}-portable.exe"
     }
   },
   "keywords": [
