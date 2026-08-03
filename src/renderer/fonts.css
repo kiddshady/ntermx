@@ -1,4 +1,4 @@
-/* Konsol — fuentes vendoreadas (bundle local).
+/* Argon — fuentes vendoreadas (bundle local).
    Antes venían de Google Fonts (remoto), lo que causaba dos problemas: (1) la app
    dependía de la red para tener su tipografía, y (2) un race al arrancar — la shell 1
    se creaba y xterm medía su glyph con la fuente fallback (Cascadia Code) ANTES de que

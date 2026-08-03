@@ -1,5 +1,5 @@
 # ===============================================================
-# Konsol — init de shell (OSC 7)
+# Argon — init de shell (OSC 7)
 # ===============================================================
 # Lo dot-sourcea main.js al abrir la terminal, DESPUÉS de que pwsh cargó el
 # perfil del usuario. Hace una sola cosa: emitir OSC 7 (cwd actual) en cada
