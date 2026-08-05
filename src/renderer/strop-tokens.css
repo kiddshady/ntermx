@@ -1,4 +1,4 @@
-/* Argon — neon design tokens (estilo Console / cyberpunk).
+/* Consolite — neon design tokens (estilo Console / cyberpunk).
    Dark, high-contrast, two-voiced: cyan accent + magenta alt. */
 
 :root {
@@ -40,7 +40,7 @@
   --st-on-danger: #ffffff;
 
   /* ── type — the machine speaks mono, the human reads sans ── */
-  --st-mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', ui-monospace, 'SF Mono', Menlo, monospace;
+  --st-mono: 'JetBrains Mono', 'Noto Sans Symbols 2', 'Cascadia Code', 'Fira Code', ui-monospace, 'SF Mono', Menlo, monospace;
   --st-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
   /* micro-labels are uppercase mono with the tracking opened up */

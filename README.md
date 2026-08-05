@@ -1,4 +1,4 @@
-# Argon
+# Consolite
 
 A cyberpunk-themed **PowerShell** terminal built with Electron. Magenta, cyan
 and yellow neon palette with a CRT scanline vibe.
@@ -53,7 +53,7 @@ src/
   main.js        Electron main: window, ptys, tray, single instance, hotkey
   preload.js     Secure IPC bridge
   prompt.ps1     Shell init: wraps the existing prompt to emit OSC 7
-  argon-tray.ico   Tray icon (small sizes only)
+  consolite-tray.ico   Tray icon (small sizes only)
   renderer/
     index.html   Markup + CSP
     styles.css   Cyberpunk theme + scanlines

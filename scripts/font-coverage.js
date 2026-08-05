@@ -46,7 +46,11 @@ const PROBES = [
   [0x2022, '• bullet chico'],
   [0x2026, '… elipsis'],
   [0x2713, '✓ check'],
-  [0x2190, '← flecha']
+  [0x2190, '← flecha'],
+  [0x2800, '⠁ braille blank'],
+  [0x280b, '⠋ braille spinner'],
+  [0x2839, '⠹ braille spinner'],
+  [0x28be, '⠾ braille']
 ];
 
 /** Entero de ancho variable de woff2: 7 bits por byte, el bit alto marca continuación. */
@@ -156,31 +160,62 @@ function check(file) {
     console.log(`  FALTA ${name.padEnd(30)} ${ranges.length} rangos · ${em} em`);
     for (const [, label] of missing) console.log(`          sin ${label}`);
   }
-  return { ok: missing.length === 0, em };
+  return { ok: missing.length === 0, em, file };
 }
 
 const args = process.argv.slice(2);
 const dir = path.join(__dirname, '..', 'src', 'renderer', 'fonts');
-const files = args.length
+
+// Todas las fuentes del bundle, no sólo JetBrains Mono. La cobertura es
+// cross-fuente: Noto Sans Symbols 2 cubre braille, JetBrains Mono cubre el
+// resto. Lo que importa es que el BUNDLE entero cubra todos los probes.
+const allFontFiles = args.length
   ? args
   : fs.readdirSync(dir)
-      .filter((f) => /^jetbrains-mono-.*\.(ttf|otf|woff2)$/.test(f))
+      .filter((f) => /\.(ttf|otf|woff2)$/.test(f))
       .map((f) => path.join(dir, f));
 
-if (files.length === 0) {
-  console.error('No hay caras de la mono en src/renderer/fonts.');
+// Sólo las caras de JetBrains Mono para el chequeo de avance uniforme
+const jbFiles = allFontFiles.filter((f) => /^jetbrains-mono-/.test(path.basename(f)));
+
+if (allFontFiles.length === 0) {
+  console.error('No hay fuentes en src/renderer/fonts.');
   process.exit(1);
 }
 
-console.log('\nCobertura de la mono (renderer DOM: sin estos rangos hay fallback)\n');
-const results = files.map(check);
+console.log('\nCobertura del bundle (renderer DOM: sin estos rangos hay fallback)\n');
 
-// Un avance distinto entre caras desalinea la grilla al pasar de normal a bold.
-const advances = new Set(results.map((r) => r.em));
-if (advances.size > 1) {
-  console.log(`\n  FALTA  las caras no comparten avance: ${[...advances].join(', ')} em`);
+// 1) Reporte por cara individual
+console.log('— Por cara —');
+const results = allFontFiles.map(check);
+
+// 2) Cobertura cross-fuente: el union de todos los cmap del bundle
+const allRanges = [];
+for (const file of allFontFiles) {
+  const { data, tables } = load(file);
+  const ranges = coveredRanges(data, tables['cmap']);
+  allRanges.push(...ranges);
+}
+allRanges.sort((a, b) => a[0] - b[0]);
+const bundleCovers = (cp) => allRanges.some(([a, b]) => cp >= a && cp <= b);
+
+const bundleMissing = PROBES.filter(([cp]) => !bundleCovers(cp));
+console.log('\n— Bundle completo —');
+if (bundleMissing.length === 0) {
+  console.log('  ok    Todos los probes cubiertos por el bundle.');
+} else {
+  console.log('  FALTA probes sin cobertura en NINGUNA fuente del bundle:');
+  for (const [, label] of bundleMissing) console.log(`          sin ${label}`);
 }
 
-const ok = results.every((r) => r.ok) && advances.size === 1;
+// 3) Avance uniforme entre caras de JetBrains Mono (si una cara tiene otro
+// advance, la grilla se desalinea al pasar de normal a bold/italic)
+const jbResults = results.filter((r) => jbFiles.includes(r.file || ''));
+const advances = new Set(jbResults.map((r) => r.em));
+if (advances.size > 1) {
+  console.log(`\n  FALTA  las caras de JetBrains Mono no comparten avance: ${[...advances].join(', ')} em`);
+}
+
+const ok = bundleMissing.length === 0 && advances.size <= 1;
 console.log(ok ? '\nTodo cubierto.\n' : '\nHay caras incompletas: las TUIs van a caer a otra fuente.\n');
 process.exit(ok ? 0 : 1);

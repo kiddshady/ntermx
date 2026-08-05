@@ -1,4 +1,4 @@
-/* Argon — fuentes vendoreadas (bundle local).
+/* Consolite — fuentes vendoreadas (bundle local).
    Antes venían de Google Fonts (remoto), lo que causaba dos problemas: (1) la app
    dependía de la red para tener su tipografía, y (2) un race al arrancar — la shell 1
    se creaba y xterm medía su glyph con la fuente fallback (Cascadia Code) ANTES de que
@@ -17,43 +17,73 @@
    arriba cubre los 2610 rangos, así que no hay fallback y la métrica es una sola.
    Pesa ~275 KB por cara en vez de ~21 KB: irrelevante leyendo de disco, no de la red.
    Se verifica con: node scripts/font-coverage.js src/renderer/fonts/*.ttf
-   Lo único que la cara NO trae es braille (U+2800–28FF) — ver nota en renderer.js. */
+   Lo único que la cara NO trae es braille (U+2800–28FF) — lo cubre Noto Sans Symbols 2,
+   también vendoreada acá abajo. */
 
 /* ── JetBrains Mono — la voz de la máquina (terminal + mono de la UI) ── */
+/* font-display: block — el navegador espera hasta 3s antes de mostrar el fallback.
+   Esto elimina el race en el que xterm medía la celda con la fuente fallback
+   (Cascadia Code) ANTES de que JetBrains Mono estuviera disponible. Con swap
+   xterm medía con la fuente equivocada y la grilla quedaba corrida; remeasure()
+   era el workaround. Con block, cuando xterm mide, la fuente ya está. */
 @font-face {
   font-family: 'JetBrains Mono';
   font-style: normal;
   font-weight: 400;
-  font-display: swap;
+  font-display: block;
   src: url('fonts/jetbrains-mono-400.ttf') format('truetype');
 }
 @font-face {
   font-family: 'JetBrains Mono';
   font-style: normal;
   font-weight: 500;
-  font-display: swap;
+  font-display: block;
   src: url('fonts/jetbrains-mono-500.ttf') format('truetype');
 }
 @font-face {
   font-family: 'JetBrains Mono';
   font-style: normal;
   font-weight: 600;
-  font-display: swap;
+  font-display: block;
   src: url('fonts/jetbrains-mono-600.ttf') format('truetype');
 }
 @font-face {
   font-family: 'JetBrains Mono';
   font-style: normal;
   font-weight: 700;
-  font-display: swap;
+  font-display: block;
   src: url('fonts/jetbrains-mono-700.ttf') format('truetype');
 }
 @font-face {
   font-family: 'JetBrains Mono';
   font-style: italic;
   font-weight: 400;
-  font-display: swap;
+  font-display: block;
   src: url('fonts/jetbrains-mono-400-italic.ttf') format('truetype');
+}
+/* Itálica bold — sin esta cara, Chromium sintetiza bold sobre la itálica de 400.
+   La síntesis ensancha el glifo y puede cambiar el advance, desalineando la celda.
+   Esto pasa cuando PSReadLine manda ESC[1;3m (bold + italic) o cuando una CLI
+   usa itálica bold para énfasis. */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: italic;
+  font-weight: 700;
+  font-display: block;
+  src: url('fonts/jetbrains-mono-700-italic.ttf') format('truetype');
+}
+
+/* ── Noto Sans Symbols 2 — braille (U+2800–28FF) ── */
+/* JetBrains Mono no trae braille. Sin esta cara, los spinners de CLIs que usan
+   patrones braille (⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏) caían a Cascadia Code si estaba instalada en el
+   sistema, o a monospace genérico si no — con advance distinto, desalineando
+   la celda. Ahora vive en el bundle, sin depender de fuentes del SO. */
+@font-face {
+  font-family: 'Noto Sans Symbols 2';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('fonts/noto-sans-symbols-2-regular.ttf') format('truetype');
 }
 
 /* ── Inter — la voz del humano (sans de la UI) ── */

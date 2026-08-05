@@ -28,11 +28,17 @@ contextBridge.exposeInMainWorld('terminal', {
 // Controles de la ventana frameless + aviso de foco del SO.
 contextBridge.exposeInMainWorld('app', {
   minimize: () => ipcRenderer.send('window:minimize'),
+  toggleMaximize: () => ipcRenderer.send('window:toggle-maximize'),
   close: () => ipcRenderer.send('window:close'),
   onFocus: (cb) => {
     const listener = () => cb();
     ipcRenderer.on('window:focus', listener);
     return () => ipcRenderer.removeListener('window:focus', listener);
+  },
+  onMaximizeState: (cb) => {
+    const listener = (_e, maximized) => cb(maximized);
+    ipcRenderer.on('window:maximize-state', listener);
+    return () => ipcRenderer.removeListener('window:maximize-state', listener);
   }
 });
 

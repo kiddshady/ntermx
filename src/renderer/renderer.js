@@ -1,4 +1,4 @@
-// Argon — renderer: xterm.js con tabs (una pty por tab) + cursor glow.
+// Consolite — renderer: xterm.js con tabs (una pty por tab) + cursor glow.
 // Globals de los bundles UMD cargados en index.html:
 //   window.Terminal, window.FitAddon, window.WebLinksAddon
 
@@ -64,15 +64,19 @@ function createTab() {
   containerEl.appendChild(el);
 
   const term = new Terminal({
-    fontFamily: "'JetBrains Mono', 'Cascadia Code', monospace",
+    fontFamily: "'JetBrains Mono', 'Noto Sans Symbols 2', 'Cascadia Code', monospace",
     fontSize: 14,
-    // lineHeight 1 (no 1.2) porque con el renderer DOM la celda ES la caja del glifo:
-    // un ▀ o un █ llenan su em box y nada más, así que todo lo que la celda mida de más
-    // queda como banda muerta ENTRE filas y parte al medio cualquier arte de bloques
-    // (el logo de Claude Code, las barras de progreso, los marcos de las TUIs). Con
-    // WebGL esto no pasaba: el addon estira el path del glifo a la celda, mida lo que
-    // mida. En 1 los bloques tilean sin costura y las verticales de los marcos se tocan.
-    lineHeight: 1,
+    // lineHeight 1.02 (no 1, no 1.2). Con el renderer DOM la celda ES la caja del
+    // glifo: un ▀ o un █ llenan su em box y nada más, así que todo lo que la celda
+    // mida de más queda como banda muerta ENTRE filas y parte al medio cualquier arte
+    // de bloques (el logo de Claude Code, las barras de progreso, los marcos de las
+    // TUIs). Con WebGL esto no pasaba: el addon estira el path del glifo a la celda,
+    // mida lo que mida. En 1 los bloques tilean sin costura y las verticales se tocan.
+    // Pero JetBrains Mono tiene un ascender/descender ratio asimétrico: con lineHeight
+    // exactamente 1, en algunos DPI (especialmente >150% scaling) quedaba un micro-gap
+    // de ~1px entre filas que cortaba las verticales de los marcos TUI. El 2% extra
+    // compensa el leading interno sin introducir una banda visible.
+    lineHeight: 1.02,
     fontWeight: 500,
     fontWeightBold: 700,
     theme: NEON_THEME,
@@ -118,9 +122,10 @@ function createTab() {
   // calzados a la celda. El core (renderer DOM) no tiene nada de eso: mete el carácter
   // en un span y deja elegir fuente a Chromium. Por eso acá la fuente tiene que cubrir
   // esos rangos sí o sí — ver la nota larga en fonts.css. Lo único que JetBrains Mono
-  // NO trae es braille (U+2800–28FF), que algunos spinners de CLI usan: eso sigue
-  // cayendo a Cascadia Code. Es 1 carácter suelto, no arte conectado, así que no se
-  // despega; si algún día molesta, la salida es volver a WebGL, no cambiar de fuente.
+  // NO trae es braille (U+2800–28FF), que algunos spinners de CLI usan: eso lo cubre
+  // Noto Sans Symbols 2, vendoreada en el bundle (ver fonts.css). No se despega porque
+  // es 1 carácter suelto, no arte conectado; si algún día molesta, la salida es volver
+  // a WebGL, no cambiar de fuente.
   term.open(el);
 
   setActiveTab(id);   // activa (y hace visible) antes de medir
@@ -337,7 +342,7 @@ function attachGlow(tab) {
       return false;
     });
   } catch (e) {
-    console.warn('[ARGON] no pude registrar el handler CSI ?25:', e && e.message);
+    console.warn('[CONSOLITE] no pude registrar el handler CSI ?25:', e && e.message);
   }
 }
 
@@ -355,7 +360,7 @@ function attachOsc7(tab) {
       return false;
     });
   } catch (e) {
-    console.warn('[ARGON] no pude registrar el handler OSC 7:', e && e.message);
+    console.warn('[CONSOLITE] no pude registrar el handler OSC 7:', e && e.message);
   }
 }
 
@@ -404,6 +409,16 @@ function wireGlobalUi() {
   document.getElementById('new-tab').addEventListener('click', () => createTab());
   document.getElementById('win-min').addEventListener('click', () => window.app.minimize());
   document.getElementById('win-close').addEventListener('click', () => window.app.close());
+
+  // Botón maximizar/restaurar: el ícono y el tooltip los dicta el estado real de
+  // la ventana, que nos llega desde main vía onMaximizeState. Click siempre
+  // togglea — nunca asumimos estado.
+  const winMax = document.getElementById('win-max');
+  winMax.addEventListener('click', () => window.app.toggleMaximize());
+  window.app.onMaximizeState((maximized) => {
+    winMax.classList.toggle('maximized', !!maximized);
+    winMax.setAttribute('data-tip', maximized ? 'Restaurar' : 'Maximizar');
+  });
 
   window.terminal.onData(({ id, data }) => {
     const tab = state.tabs.find((t) => t.ptyId === id);

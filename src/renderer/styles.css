@@ -1,4 +1,4 @@
-/* Argon — estética cyberpunk (estilo Console).
+/* Consolite — estética cyberpunk (estilo Console).
    Colores y métricas viven en strop-tokens.css; acá vive el componente. */
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -210,6 +210,18 @@ html, body {
 .win-btn:hover { background: #1a1a28; color: var(--text); }
 .win-btn.close:hover { background: var(--red); color: #fff; }
 
+/* Botón maximizar: dos íconos superpuestos; el estado (clase .maximized en el
+   botón) decide cuál se ve. */
+#win-max { position: relative; }
+#win-max .ico-max,
+#win-max .ico-restore {
+  position: absolute;
+  transition: opacity .12s ease;
+}
+#win-max .ico-restore { opacity: 0; }
+#win-max.maximized .ico-max    { opacity: 0; }
+#win-max.maximized .ico-restore { opacity: 1; }
+
 /* ========== TOOLTIP PROPIO ========== */
 /* Un solo nodo (#tooltip) portaleado al body; renderer.js lo posiciona y togglea .show.
    Reemplaza al title nativo de Chromium. Hairline por box-shadow inset, no border:
@@ -222,7 +234,7 @@ html, body {
   background: var(--bg-elevated);
   border-radius: 6px;
   box-shadow: 0 4px 16px rgba(0,0,0,.5), inset 0 0 0 1px var(--border-subtle);
-  color: var(--text-dim);
+  color: var(--text);
   font-family: var(--font-sans);
   font-size: 11px;
   line-height: 1.45;

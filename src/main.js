@@ -13,8 +13,6 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const pty = require('node-pty');
-const { execFileSync } = require('child_process');
-
 /** @type {import('electron').BrowserWindow | null} */
 let mainWindow = null;
 let tray = null;
@@ -23,19 +21,6 @@ let isQuitting = false;
 /** ptys vivos, por id. Cada tab del renderer tiene el suyo. */
 const shells = new Map();
 let ptyIdCounter = 0;
-
-// ---------------------------------------------------------------------------
-// Instancia única: si ya hay una corriendo, la segunda se cierra y hace aparecer
-// la primera (que puede estar escondida en el tray).
-// ---------------------------------------------------------------------------
-const gotTheLock = app.requestSingleInstanceLock();
-if (!gotTheLock) {
-  app.quit();
-} else {
-  app.on('second-instance', () => {
-    revealWindow();
-  });
-}
 
 /** Trae la ventana al frente esté oculta en el tray, minimizada o solo sin foco. */
 function revealWindow() {
@@ -76,7 +61,7 @@ function resolveInitScript() {
     fs.writeFileSync(dest, content, 'utf8');
     initScriptPath = dest;
   } catch (err) {
-    console.error('[ARGON] no pude preparar el init de shell:', err.message);
+    console.error('[CONSOLITE] no pude preparar el init de shell:', err.message);
     initScriptPath = null;
   }
   return initScriptPath;
@@ -129,7 +114,7 @@ function createWindow() {
     height: 626,
     minWidth: 520,
     minHeight: 360,
-    title: 'Argon',
+    title: 'Consolite',
     backgroundColor: '#050507', // con Electron 40 esto tiñe el frame fantasma del compositor
     titleBarStyle: 'hidden',
     frame: false,
@@ -154,6 +139,18 @@ function createWindow() {
     }
   });
 
+  // Estado de maximizado: el renderer lo usa para swapear el ícono del botón
+  // maximizar/restaurar. Mandamos el estado inicial y luego cada cambio.
+  const sendMaxState = () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('window:maximize-state', mainWindow.isMaximized());
+    }
+  };
+  mainWindow.on('maximize', sendMaxState);
+  mainWindow.on('unmaximize', sendMaxState);
+  // El primer estado llega cuando el renderer termine de cargar; lo mandamos ahí.
+  mainWindow.webContents.once('did-finish-load', sendMaxState);
+
   // Cerrar esconde al tray en vez de matar la app: las shells siguen vivas.
   mainWindow.on('close', (e) => {
     if (!isQuitting) {
@@ -170,16 +167,16 @@ function createWindow() {
 // Tray
 // ---------------------------------------------------------------------------
 function createTray() {
-  const iconPath = path.join(__dirname, 'argon-tray.ico');
+  const iconPath = path.join(__dirname, 'consolite-tray.ico');
   if (!fs.existsSync(iconPath)) {
-    console.error('[ARGON] falta el ícono del tray:', iconPath);
+    console.error('[CONSOLITE] falta el ícono del tray:', iconPath);
     return;
   }
   tray = new Tray(nativeImage.createFromPath(iconPath));
 
-  tray.setToolTip('Argon');
+  tray.setToolTip('Consolite');
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Mostrar Argon', click: revealWindow },
+    { label: 'Mostrar Consolite', click: revealWindow },
     { type: 'separator' },
     { label: 'Salir', click: () => { isQuitting = true; app.quit(); } }
   ]));
@@ -203,7 +200,7 @@ function toggleWindow() {
 function registerHotkeys() {
   const ok = globalShortcut.register('CommandOrControl+Alt+T', toggleWindow);
   if (!ok) {
-    console.error('[ARGON] no pude registrar Ctrl+Alt+T (¿lo tiene tomado otra app?)');
+    console.error('[CONSOLITE] no pude registrar Ctrl+Alt+T (¿lo tiene tomado otra app?)');
   }
 }
 
@@ -234,91 +231,24 @@ ipcMain.on('window:minimize', () => {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.minimize();
 });
 
+// Maximize toggle: si está maximizada restaura, si no maximiza. Hacerlo con
+// isMaximized() en vez de mandar maximize() ciegamente permite que el botón
+// funcione igual en ventanas secundarias o cuando el estado del renderer se
+// desincronice (p.ej. al arrastrar la ventana al borde superior en Win11, que
+// maximiza sin pasar por acá).
+ipcMain.on('window:toggle-maximize', () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMaximized()) mainWindow.unmaximize();
+  else mainWindow.maximize();
+});
+
 ipcMain.on('window:close', () => {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close();
 });
 
-// ---------------------------------------------------------------------------
-// Restos de una instancia anterior
-// ---------------------------------------------------------------------------
-// Una salida sucia —un cierre que no termina de irse, un crash a mitad del quit— deja un
-// proceso huérfano. Su ventana ya no renderiza, pero Windows la sigue componiendo, lavada,
-// por debajo de la nueva: abrir la app se ve como un pestañeo gris. No es un problema de
-// pintado, el layout ya está entero; lo único que se mueve es el alfa.
-//
-// Registramos el PID de cada main que arranca y el siguiente mata al anterior si sigue
-// vivo. El registro NO se borra al salir, a propósito: si el proceso se fue de verdad la
-// consulta falla sola y no cuesta un spawn; si quedó colgado, es justo lo que buscamos.
-//
-// Corre sólo después de ganar el lock de instancia única, así que cualquier otro proceso
-// nuestro que siga vivo es por definición un resto. Si el colgado fuera el que RETIENE el
-// lock, esta instancia ni arranca: ese caso queda afuera a propósito, porque matar a quien
-// tiene el lock es exactamente lo que el lock existe para evitar.
-
-const instanceRecordPath = () => path.join(app.getPath('userData'), 'instance.json');
-
-/** Mata el main de la corrida anterior si quedó colgado. */
-function killLeftoverInstance() {
-  let rec;
-  try { rec = JSON.parse(fs.readFileSync(instanceRecordPath(), 'utf8')); } catch { return; }
-  if (!rec || !Number.isInteger(rec.pid) || rec.pid === process.pid) return;
-
-  // ¿sigue vivo? kill(pid, 0) no manda ninguna señal, sólo consulta. ESRCH = ya no existe
-  // (el camino normal, y sale gratis). EPERM significa que existe pero no lo podemos
-  // señalizar, así que seguimos: taskkill /F puede llegar igual.
-  try { process.kill(rec.pid, 0); }
-  catch (err) { if (err.code !== 'EPERM') return; }
-
-  // Vivo. Puede ser el colgado… o un PID reciclado por un proceso ajeno, así que antes de
-  // matar nada confirmamos que la ruta del ejecutable es la nuestra.
-  let exe;
-  try {
-    exe = execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command',
-      `(Get-CimInstance Win32_Process -Filter "ProcessId=${rec.pid}").ExecutablePath`],
-      { encoding: 'utf8', timeout: 5000, windowsHide: true }).trim();
-  } catch (err) {
-    console.error(`[ARGON] no pude verificar el PID ${rec.pid}:`, err.message);
-    return;
-  }
-  const samePath = (a, b) => path.normalize(a).toLowerCase() === path.normalize(b).toLowerCase();
-  if (!exe || !samePath(exe, process.execPath)) return;   // no es nuestro: no se toca
-
-  // /T se lleva también los helpers (renderer, GPU, utility): no mueren solos si el main
-  // quedó colgado, y son los que retienen la superficie que Windows sigue componiendo.
-  try {
-    execFileSync('taskkill', ['/PID', String(rec.pid), '/T', '/F'],
-      { timeout: 5000, windowsHide: true, stdio: 'ignore' });
-    console.log(`[ARGON] resto de una instancia anterior (PID ${rec.pid}) eliminado`);
-  } catch (err) {
-    console.error(`[ARGON] no pude eliminar el PID ${rec.pid}:`, err.message);
-  }
-}
-
-/** Deja registrado nuestro PID para que la próxima corrida sepa a quién mirar. */
-function recordInstance() {
-  try {
-    fs.writeFileSync(instanceRecordPath(),
-      JSON.stringify({ pid: process.pid, version: app.getVersion() }), 'utf8');
-  } catch (err) {
-    console.error('[ARGON] no pude registrar el PID de la instancia:', err.message);
-  }
-}
-
 // ---- Ciclo de vida ----
 
 app.whenReady().then(() => {
-  // La instancia que pierde el lock ya llamó a app.quit() allá arriba, pero quit() es
-  // asíncrono y whenReady llega igual: verificado, la segunda instancia alcanzaba a crear
-  // ventana, tray y hotkeys antes de irse. Eso es el pestañeo al abrir la app estando ya
-  // corriendo — dos ventanas por un instante, uno que se muere enseguida. Y sin este corte
-  // killLeftoverInstance mataría el PID registrado, que es el de la instancia legítima.
-  if (!gotTheLock) return;
-
-  // Si quedó una huérfana de la corrida anterior, que se vaya antes de crear la ventana,
-  // para que no lleguen a convivir en pantalla.
-  killLeftoverInstance();
-  recordInstance();
-
   createWindow();
   createTray();
   registerHotkeys();

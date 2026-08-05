@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'self'; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self';" />
-  <title>Argon</title>
+  <title>Consolite</title>
   <link rel="stylesheet" href="fonts.css" />
   <link rel="stylesheet" href="../../node_modules/@xterm/xterm/css/xterm.css" />
   <link rel="stylesheet" href="strop-tokens.css" />
@@ -30,6 +30,12 @@
       <div class="win-controls">
         <div class="win-btn" id="win-min" data-tip="Minimizar">
           <svg width="13" height="13" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </div>
+        <div class="win-btn" id="win-max" data-tip="Maximizar">
+          <!-- Ícono maximizar: cuadrado -->
+          <svg class="ico-max" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="5" width="14" height="14" rx="1"></rect></svg>
+          <!-- Ícono restaurar: dos cuadrados superpuestos. Visible sólo cuando está maximizada. -->
+          <svg class="ico-restore" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="8" y="3" width="13" height="13" rx="1"></rect><path d="M8 8 H 5 a 1 1 0 0 0 -1 1 V 21 a 1 1 0 0 0 1 1 H 17 a 1 1 0 0 0 1 -1 V 18"></path></svg>
         </div>
         <div class="win-btn close" id="win-close" data-tip="Cerrar (va al tray)">
           <svg width="13" height="13" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>

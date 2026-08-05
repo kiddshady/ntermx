@@ -1,8 +1,8 @@
 {
-  "name": "argon",
-  "productName": "Argon",
+  "name": "consolite",
+  "productName": "Consolite",
   "version": "0.1.1",
-  "description": "Argon — PowerShell con estética cyberpunk",
+  "description": "Consolite — PowerShell con estética cyberpunk",
   "main": "src/main.js",
   "author": "francisco",
   "license": "MIT",
@@ -14,8 +14,8 @@
     "postinstall": "node scripts/fix-node-pty-spectre.js && electron-builder install-app-deps"
   },
   "build": {
-    "appId": "com.umbrovex.argon",
-    "productName": "Argon",
+    "appId": "com.umbrovex.consolite",
+    "productName": "Consolite",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -43,10 +43,10 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Argon"
+      "shortcutName": "Consolite"
     },
     "portable": {
-      "artifactName": "Argon-${version}-portable.exe"
+      "artifactName": "Consolite-${version}-portable.exe"
     }
   },
   "keywords": [
