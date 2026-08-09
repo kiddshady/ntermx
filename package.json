@@ -1,8 +1,8 @@
 {
-  "name": "consolite",
-  "productName": "Consolite",
+  "name": "ntermx",
+  "productName": "ntermx",
   "version": "0.1.1",
-  "description": "Consolite — PowerShell con estética cyberpunk",
+  "description": "ntermx — PowerShell con estética cyberpunk",
   "main": "src/main.js",
   "author": "francisco",
   "license": "MIT",
@@ -14,8 +14,8 @@
     "postinstall": "node scripts/fix-node-pty-spectre.js && electron-builder install-app-deps"
   },
   "build": {
-    "appId": "com.umbrovex.consolite",
-    "productName": "Consolite",
+    "appId": "com.umbrovex.ntermx",
+    "productName": "ntermx",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -43,10 +43,10 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Consolite"
+      "shortcutName": "ntermx"
     },
     "portable": {
-      "artifactName": "Consolite-${version}-portable.exe"
+      "artifactName": "ntermx-${version}-portable.exe"
     }
   },
   "keywords": [

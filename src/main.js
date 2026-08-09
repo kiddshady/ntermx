@@ -61,7 +61,7 @@ function resolveInitScript() {
     fs.writeFileSync(dest, content, 'utf8');
     initScriptPath = dest;
   } catch (err) {
-    console.error('[CONSOLITE] no pude preparar el init de shell:', err.message);
+    console.error('[NTERMX] no pude preparar el init de shell:', err.message);
     initScriptPath = null;
   }
   return initScriptPath;
@@ -114,7 +114,7 @@ function createWindow() {
     height: 626,
     minWidth: 520,
     minHeight: 360,
-    title: 'Consolite',
+    title: 'ntermx',
     backgroundColor: '#050507', // con Electron 40 esto tiñe el frame fantasma del compositor
     titleBarStyle: 'hidden',
     frame: false,
@@ -167,16 +167,16 @@ function createWindow() {
 // Tray
 // ---------------------------------------------------------------------------
 function createTray() {
-  const iconPath = path.join(__dirname, 'consolite-tray.ico');
+  const iconPath = path.join(__dirname, 'ntermx-tray.ico');
   if (!fs.existsSync(iconPath)) {
-    console.error('[CONSOLITE] falta el ícono del tray:', iconPath);
+    console.error('[NTERMX] falta el ícono del tray:', iconPath);
     return;
   }
   tray = new Tray(nativeImage.createFromPath(iconPath));
 
-  tray.setToolTip('Consolite');
+  tray.setToolTip('ntermx');
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Mostrar Consolite', click: revealWindow },
+    { label: 'Mostrar ntermx', click: revealWindow },
     { type: 'separator' },
     { label: 'Salir', click: () => { isQuitting = true; app.quit(); } }
   ]));
@@ -200,7 +200,7 @@ function toggleWindow() {
 function registerHotkeys() {
   const ok = globalShortcut.register('CommandOrControl+Alt+T', toggleWindow);
   if (!ok) {
-    console.error('[CONSOLITE] no pude registrar Ctrl+Alt+T (¿lo tiene tomado otra app?)');
+    console.error('[NTERMX] no pude registrar Ctrl+Alt+T (¿lo tiene tomado otra app?)');
   }
 }
 

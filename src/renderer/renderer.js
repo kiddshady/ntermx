@@ -1,4 +1,4 @@
-// Consolite — renderer: xterm.js con tabs (una pty por tab) + cursor glow.
+// ntermx — renderer: xterm.js con tabs (una pty por tab) + cursor glow.
 // Globals de los bundles UMD cargados en index.html:
 //   window.Terminal, window.FitAddon, window.WebLinksAddon
 
@@ -342,7 +342,7 @@ function attachGlow(tab) {
       return false;
     });
   } catch (e) {
-    console.warn('[CONSOLITE] no pude registrar el handler CSI ?25:', e && e.message);
+    console.warn('[NTERMX] no pude registrar el handler CSI ?25:', e && e.message);
   }
 }
 
@@ -360,7 +360,7 @@ function attachOsc7(tab) {
       return false;
     });
   } catch (e) {
-    console.warn('[CONSOLITE] no pude registrar el handler OSC 7:', e && e.message);
+    console.warn('[NTERMX] no pude registrar el handler OSC 7:', e && e.message);
   }
 }
 
