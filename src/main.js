@@ -205,9 +205,9 @@ function createTray() {
 
   tray.setToolTip('ntermx');
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Mostrar ntermx', click: revealWindow },
+    { label: 'Show ntermx', click: revealWindow },
     { type: 'separator' },
-    { label: 'Salir', click: () => { isQuitting = true; app.quit(); } }
+    { label: 'Quit', click: () => { isQuitting = true; app.quit(); } }
   ]));
 
   tray.on('click', toggleWindow);
@@ -236,7 +236,7 @@ function registerHotkeys() {
     // En la app empaquetada nadie ve la consola, así que el fallo se cuenta también
     // en el tray: si no, el atajo simplemente "no anda" y no hay forma de saber por qué.
     console.error('[NTERMX] no pude registrar Ctrl+Alt+T: lo tiene tomado otra app.');
-    if (tray) tray.setToolTip('ntermx — Ctrl+Alt+T no disponible (lo tiene otra app)');
+    if (tray) tray.setToolTip('ntermx — Ctrl+Alt+T unavailable (taken by another app)');
   }
   return ok;
 }
@@ -358,7 +358,7 @@ ipcMain.handle('update:check', (_e, opts) => {
   updateManual = !!(opts && opts.manual);
   if (!app.isPackaged) { simCheck(); return { simulated: true }; }
   const up = getAutoUpdater();
-  if (!up) { sendUpdate('error', { error: 'El updater no está disponible.' }); return { ok: false }; }
+  if (!up) { sendUpdate('error', { error: 'Updater unavailable.' }); return { ok: false }; }
   wireAutoUpdater(up);
   Promise.resolve(up.checkForUpdates()).catch((err) => sendUpdate('error', { error: err.message }));
   return { ok: true };

@@ -23,21 +23,21 @@
 
       <div id="tabs"></div>
 
-      <div class="new-tab" id="new-tab" data-tip="Nueva shell (Ctrl+Shift+T)">
+      <div class="new-tab" id="new-tab" data-tip="New shell (Ctrl+Shift+T)">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
       </div>
 
       <div class="win-controls">
-        <div class="win-btn" id="win-min" data-tip="Minimizar">
+        <div class="win-btn" id="win-min" data-tip="Minimize">
           <svg width="13" height="13" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
         </div>
-        <div class="win-btn" id="win-max" data-tip="Maximizar">
+        <div class="win-btn" id="win-max" data-tip="Maximize">
           <!-- Ícono maximizar: cuadrado -->
           <svg class="ico-max" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="5" width="14" height="14" rx="1"></rect></svg>
           <!-- Ícono restaurar: dos cuadrados superpuestos. Visible sólo cuando está maximizada. -->
           <svg class="ico-restore" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="8" y="3" width="13" height="13" rx="1"></rect><path d="M8 8 H 5 a 1 1 0 0 0 -1 1 V 21 a 1 1 0 0 0 1 1 H 17 a 1 1 0 0 0 1 -1 V 18"></path></svg>
         </div>
-        <div class="win-btn close" id="win-close" data-tip="Cerrar (va al tray)">
+        <div class="win-btn close" id="win-close" data-tip="Close (hides to tray)">
           <svg width="13" height="13" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </div>
       </div>
@@ -52,7 +52,7 @@
         <span class="shell" id="status-shell">pwsh</span>
         <!-- La versión la rellena renderer.js con app.getVersion(); click = buscar
              actualizaciones. Arranca vacía y aparece con un fade cuando llega. -->
-        <button class="version" id="status-version" data-tip="Buscar actualizaciones"></button>
+        <button class="version" id="status-version" data-tip="Check for updates"></button>
         <span class="time" id="status-time">--:--:--</span>
       </div>
     </div>

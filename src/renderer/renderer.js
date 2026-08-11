@@ -266,8 +266,8 @@ function renderTabs() {
   const atLimit = state.tabs.length >= MAX_TABS;
   plus.classList.toggle('at-limit', atLimit);
   plus.dataset.tip = atLimit
-    ? `Llegaste al máximo de shells (${MAX_TABS})`
-    : 'Nueva shell (Ctrl+Shift+T)';
+    ? `Shell limit reached (${MAX_TABS})`
+    : 'New shell (Ctrl+Shift+T)';
 }
 
 // ===========================================================================
@@ -443,7 +443,7 @@ function wireGlobalUi() {
   winMax.addEventListener('click', () => window.app.toggleMaximize());
   window.app.onMaximizeState((maximized) => {
     winMax.classList.toggle('maximized', !!maximized);
-    winMax.setAttribute('data-tip', maximized ? 'Restaurar' : 'Maximizar');
+    winMax.setAttribute('data-tip', maximized ? 'Restore' : 'Maximize');
   });
 
   window.terminal.onData(({ id, data }) => {
@@ -457,7 +457,7 @@ function wireGlobalUi() {
     const tab = state.tabs.find((t) => t.ptyId === id);
     if (!tab) return;
     tab.ptyId = null;
-    tab.term.write(`\r\n\x1b[38;2;255;0;68m[el proceso terminó con código ${exitCode}]\x1b[0m\r\n`);
+    tab.term.write(`\r\n\x1b[38;2;255;0;68m[process exited with code ${exitCode}]\x1b[0m\r\n`);
   });
 
   // Foco a nivel SO (alt-tab, click en taskbar, restore desde el tray): se lo pasamos
@@ -639,7 +639,7 @@ function utRow(icon, label, title, sub, closable) {
         `<div class="ut-title">${title}</div>` +
         (sub ? `<div class="ut-sub">${sub}</div>` : '') +
       `</div>` +
-      (closable ? `<button class="ut-close" data-ut="later" data-tip="Descartar">${UT_SVG.x}</button>` : '') +
+      (closable ? `<button class="ut-close" data-ut="later" data-tip="Dismiss">${UT_SVG.x}</button>` : '') +
     `</div>`
   );
 }
@@ -663,47 +663,47 @@ function renderUpdate(status) {
   switch (phase) {
     case 'checking':
       if (!manual) return; // auto-check: callado hasta que haya novedad
-      updateToast.render(utRow(UT_SVG.spin, 'Buscando', 'Buscando actualizaciones…', '', false));
+      updateToast.render(utRow(UT_SVG.spin, 'Checking', 'Checking for updates…', '', false));
       break;
     case 'available':
       updateToast.render(
-        utRow(UT_SVG.rocket, 'Actualización', `ntermx <b>v${version}</b> disponible`, 'Hay una versión nueva lista para descargar.', true) +
+        utRow(UT_SVG.rocket, 'Update', `ntermx <b>v${version}</b> is available`, 'A new version is ready to download.', true) +
         `<div class="ut-actions">` +
-          `<button class="ut-btn primary" data-ut="download">Descargar</button>` +
-          `<button class="ut-btn ghost" data-ut="later">Después</button>` +
+          `<button class="ut-btn primary" data-ut="download">Download</button>` +
+          `<button class="ut-btn ghost" data-ut="later">Later</button>` +
         `</div>`
       );
       break;
     case 'downloading': {
       const pct = Math.max(0, Math.min(100, Math.round(status.percent || 0)));
       updateToast.render(
-        utRow(UT_SVG.down, 'Descargando', `Bajando la actualización… <span class="ut-pct">${pct}%</span>`, '', false) +
+        utRow(UT_SVG.down, 'Downloading', `Downloading update… <span class="ut-pct">${pct}%</span>`, '', false) +
         `<div class="ut-progress"><div class="ut-progress-bar" style="width:${pct}%"></div></div>`
       );
       break;
     }
     case 'downloaded':
       updateToast.render(
-        utRow(UT_SVG.check, 'Lista', `ntermx <b>v${version}</b> descargada`, 'Reiniciá para terminar de instalarla.', true) +
+        utRow(UT_SVG.check, 'Ready', `ntermx <b>v${version}</b> downloaded`, 'Restart to finish installing.', true) +
         `<div class="ut-actions">` +
-          `<button class="ut-btn primary" data-ut="install">Reiniciar e instalar</button>` +
-          `<button class="ut-btn ghost" data-ut="later">Después</button>` +
+          `<button class="ut-btn primary" data-ut="install">Restart &amp; install</button>` +
+          `<button class="ut-btn ghost" data-ut="later">Later</button>` +
         `</div>`,
         'ready'
       );
       break;
     case 'none':
       if (!manual) { updateToast.dismiss(); return; }
-      updateToast.render(utRow(UT_SVG.check, 'Al día', 'Ya tenés la última versión.', '', true), 'ready');
+      updateToast.render(utRow(UT_SVG.check, 'Up to date', 'Already on the latest version.', '', true), 'ready');
       updateToast.autoDismiss(2800);
       break;
     case 'error':
       if (!manual) { updateToast.dismiss(); return; }
-      updateToast.render(utRow(UT_SVG.alert, 'Falló', escapeHtml(status.error || 'No pude buscar actualizaciones.'), '', true), 'error');
+      updateToast.render(utRow(UT_SVG.alert, 'Update failed', escapeHtml(status.error || 'Couldn\'t check for updates.'), '', true), 'error');
       updateToast.autoDismiss(4200);
       break;
     case 'sim-install':
-      updateToast.render(utRow(UT_SVG.restart, 'Instalando', 'Reiniciando para instalar… (simulado en dev)', '', false), 'ready');
+      updateToast.render(utRow(UT_SVG.restart, 'Installing', 'Restarting to install… (simulated in dev)', '', false), 'ready');
       updateToast.autoDismiss(2800);
       break;
   }
