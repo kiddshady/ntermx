@@ -83,3 +83,24 @@ from [Visual Studio Build Tools](https://visualstudio.microsoft.com/downloads/)
 plus Python, then `npm install` again. As an alternative you can swap the
 dependency in `package.json` for the prebuilt fork
 `node-pty-prebuilt-multiarch`.
+
+**Accented characters come out as `C├│rdoba` instead of `Córdoba`.** That is the
+console code page, not the font. ConPTY starts the shell on the system OEM code
+page, so a native `.exe` writing raw UTF-8 bytes gets decoded wrong — and since
+an accented character is two bytes in UTF-8, you get two glyphs. ntermx fixes
+this from `src/prompt.ps1`; if you see it in another terminal, `chcp 65001` in
+that session is the equivalent.
+
+## Licence
+
+ntermx is MIT — see [LICENSE](LICENSE).
+
+The bundled typefaces are **not** MIT. All three ship under the
+[SIL Open Font License 1.1](https://scripts.sil.org/OFL), whose terms travel
+with the files:
+
+| Font | Copyright | Licence |
+|---|---|---|
+| JetBrains Mono | 2020 The JetBrains Mono Project Authors | [OFL-JetBrainsMono.txt](src/renderer/fonts/OFL-JetBrainsMono.txt) |
+| Inter | 2016 The Inter Project Authors | [OFL-Inter.txt](src/renderer/fonts/OFL-Inter.txt) |
+| Noto Sans Symbols 2 | 2022 The Noto Project Authors | [OFL-NotoSansSymbols2.txt](src/renderer/fonts/OFL-NotoSansSymbols2.txt) |
