@@ -12,11 +12,20 @@ and yellow neon palette with a CRT scanline vibe.
   shell init only *wraps* it to emit OSC 7, so the status bar can follow the cwd
 - Tabs: one PowerShell per tab (`Ctrl+Shift+T` new, `Ctrl+Shift+W` close,
   `Ctrl+Tab` to cycle), up to 8
-- Lives in the system tray, single instance only, and toggles with the global
-  `Ctrl+Alt+T` hotkey — closing the window hides it, the shells keep running
-- xterm.js frontend with WebGL renderer + clickable links + auto-fit
+- Lives in the system tray and toggles with the global `Ctrl+Alt+T` hotkey —
+  closing the window hides it, the shells keep running
+- **UTF-8 console.** ConPTY hands the shell a console that starts on the system
+  OEM code page (850 on a Spanish Windows), so any native `.exe` writing raw
+  UTF-8 bytes got mangled — `Córdoba` arrived as `C├│rdoba`. The shell init puts
+  the console on 65001, which applies to every child process
+- xterm.js frontend with the DOM renderer + clickable links + auto-fit. DOM and
+  not WebGL on purpose: the WebGL addon rasterises glyphs into a texture atlas
+  and clips italics, so PSReadLine's autocomplete hint rendered like a subscript
+- Fonts are vendored, not fetched: full JetBrains Mono TTF (box drawing and
+  block elements included, so TUI frames don't come apart) plus Noto Sans
+  Symbols 2 for braille spinners
 - Scanlines, cursor glow and neon scrollbar
-- Secure by default: context isolation on, node integration off
+- Secure by default: context isolation on, node integration off, CSP in place
 
 ## Requirements
 
@@ -34,8 +43,8 @@ npm start
 
 ## Build an installer
 
-Built with [electron-builder](https://www.electron.build/) (same as Console and
-Umbra). Output lands in `dist/`.
+Built with [electron-builder](https://www.electron.build/). Output lands in
+`dist/`.
 
 ```bash
 npm run dist          # NSIS installer + portable, x64
@@ -47,17 +56,23 @@ npm run dist:portable # portable .exe only
 
 ```
 build/
-  icon.ico       App + installer icon
-  icon.png       Same icon, 512px source
+  icon.ico            App + installer icon
+  icon.png            Same icon, 512px source
+scripts/
+  fix-node-pty-spectre.js  Postinstall patch for the node-pty native build
+  font-coverage.js         Checks a TTF actually covers the ranges we rely on
 src/
-  main.js        Electron main: window, ptys, tray, single instance, hotkey
-  preload.js     Secure IPC bridge
-  prompt.ps1     Shell init: wraps the existing prompt to emit OSC 7
-  ntermx-tray.ico   Tray icon (small sizes only)
+  main.js             Electron main: window, ptys, tray, global hotkey
+  preload.js          Secure IPC bridge
+  prompt.ps1          Shell init: UTF-8 console + wraps the prompt to emit OSC 7
+  ntermx-tray.ico     Tray icon (small sizes only)
   renderer/
-    index.html   Markup + CSP
-    styles.css   Cyberpunk theme + scanlines
-    renderer.js  Tabs, xterm.js setup, cursor glow, IPC wiring
+    index.html        Markup + CSP
+    strop-tokens.css  Design tokens (cyan accent, magenta alt)
+    styles.css        Cyberpunk theme + scanlines
+    fonts.css         Vendored @font-face declarations
+    fonts/            JetBrains Mono, Noto Sans Symbols 2, Inter (+ OFL licences)
+    renderer.js       Tabs, xterm.js setup, cursor glow, IPC wiring
 ```
 
 ## Troubleshooting
