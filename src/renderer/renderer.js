@@ -2,7 +2,7 @@
 // Globals de los bundles UMD cargados en index.html:
 //   window.Terminal, window.FitAddon, window.WebLinksAddon
 
-const MAX_TABS = 8;
+const MAX_TABS = 4;
 
 /** @type {{tabs: any[], activeId: number|null}} */
 const state = { tabs: [], activeId: null };
@@ -47,6 +47,7 @@ const tabsEl = document.getElementById('tabs');
   }
   initTooltips();
   wireGlobalUi();
+  initUpdates();
   createTab();
   setStatusTime();
   setInterval(setStatusTime, 1000);
@@ -165,17 +166,42 @@ function closeTab(id) {
   if (tab.ptyId !== null) window.terminal.kill(tab.ptyId);
   state.tabs.splice(idx, 1);
 
-  // La tab se va con su animación de salida; recién ahí desmontamos.
-  const node = tabsEl.querySelector(`[data-tab="${id}"]`);
+  // El panel de la terminal y el chip de la barra son dos elementos distintos, y cada
+  // uno se va con SU animación. El panel se iba con la del chip, que vive en otra parte
+  // del DOM — y encima nunca llegaba a hacer su fade: el splice de arriba ya lo sacó de
+  // state.tabs, así que el toggle de setActiveTab (que sólo recorre state.tabs) no lo
+  // alcanzaba y el panel se quedaba con .active, o sea a opacity 1. Como todas las
+  // instancias son absolute sobre el mismo inset, el prompt que se iba quedaba pintado
+  // encima del que entraba hasta que el chip terminara de animar.
+  let dropped = false;
   const drop = () => {
+    if (dropped) return;
+    dropped = true;
     try { tab.term.dispose(); } catch { /* noop */ }
     tab.el.remove();
   };
-  if (node) {
-    node.classList.add('tab-leaving');
-    node.addEventListener('animationend', () => { node.remove(); drop(); }, { once: true });
+
+  // Sacarle .active dispara su fade de salida: la misma transición de opacity que ya
+  // hace el cross-fade al cambiar de tab, que es justo la que se sentía bien al abrir.
+  // Desmontamos cuando termina la suya, no la del chip. Si la tab cerrada no era la
+  // visible ya está en opacity 0: no hay transición, no va a haber transitionend, y la
+  // desmontamos derecho (invisible como está, nadie ve el corte).
+  const wasVisible = tab.el.classList.contains('active');
+  tab.el.classList.remove('active');
+  if (wasVisible) {
+    tab.el.addEventListener('transitionend', drop, { once: true });
+    // Red de seguridad: sin repaint (ventana escondida en el tray) la transición no
+    // corre y transitionend no llega nunca — sin esto quedaría un term sin dispose.
+    setTimeout(drop, 400);
   } else {
     drop();
+  }
+
+  // El chip se va con la suya y se desmonta solo, ya sin arrastrar al panel.
+  const node = tabsEl.querySelector(`[data-tab="${id}"]`);
+  if (node) {
+    node.classList.add('tab-leaving');
+    node.addEventListener('animationend', () => node.remove(), { once: true });
   }
 
   if (state.activeId === id) {
@@ -513,4 +539,205 @@ function initTooltips() {
     if (e.target.closest('[data-tip]')) hide();
   });
   document.addEventListener('mousedown', hide);
+}
+
+// ===========================================================================
+// Auto-update — toast + versión clickeable en la status bar
+// ===========================================================================
+/* Un solo nodo que muta de fase en vez de una caja por estado. Mientras baja la
+   descarga sólo movemos el ancho de la barra (sin reconstruir el contenido) para que la
+   animación de width sea continua. Los chequeos automáticos (manual=false) que no traen
+   novedad se silencian; los que pediste vos siempre dan respuesta, aunque sea "al día". */
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
+
+const UT_SVG = {
+  rocket: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/></svg>',
+  down: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+  check: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+  alert: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+  spin: '<svg class="ut-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.22-8.56"/></svg>',
+  restart: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>',
+  x: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+};
+
+const updateToast = {
+  _node: null,
+  _hideTimer: 0,
+  _endMorph: null,
+  get node() { return this._node || (this._node = document.getElementById('update-toast')); },
+  render(inner, variant) {
+    const n = this.node; if (!n) return;
+    clearTimeout(this._hideTimer);
+
+    // ¿Es una entrada (toast oculto/vacío) o una mutación de uno ya visible?
+    const visible = n.classList.contains('show') && n.innerHTML !== '';
+    const fromH = visible ? n.getBoundingClientRect().height : 0;
+    this._stopMorph();
+
+    n.classList.remove('ready', 'error');
+    if (variant) n.classList.add(variant);
+    n.innerHTML = inner;
+
+    if (!visible) {
+      // Entrada: forzamos un reflow para que el estado "oculto" (opacity 0 + translateX)
+      // quede comprometido ANTES de agregar .show; si no, el navegador junta los dos
+      // frames en uno y la caja aparece de golpe en vez de deslizarse.
+      void n.offsetWidth;
+      n.classList.add('show');
+      return;
+    }
+
+    // Mutación: el contenido nuevo ya define el alto final; interpolamos desde el viejo.
+    const toH = n.getBoundingClientRect().height;
+    if (Math.round(fromH) === Math.round(toH)) return; // mismo alto: nada que animar
+    n.style.height = fromH + 'px';
+    n.classList.add('morphing');
+    void n.offsetHeight; // comprometer el alto viejo con la transición ya activa
+    n.style.height = toH + 'px';
+    this._endMorph = (e) => {
+      if (e && e.propertyName !== 'height') return;
+      this._stopMorph();
+    };
+    n.addEventListener('transitionend', this._endMorph);
+  },
+  // Vuelve a height:auto. Idempotente: lo llaman el transitionend, el próximo render y dismiss().
+  _stopMorph() {
+    const n = this.node; if (!n) return;
+    if (this._endMorph) { n.removeEventListener('transitionend', this._endMorph); this._endMorph = null; }
+    n.classList.remove('morphing');
+    n.style.height = '';
+  },
+  autoDismiss(ms) {
+    clearTimeout(this._hideTimer);
+    this._hideTimer = setTimeout(() => this.dismiss(), ms);
+  },
+  dismiss() {
+    const n = this.node; if (!n) return;
+    clearTimeout(this._hideTimer);
+    this._stopMorph(); // que un morph a medio camino no deje el alto clavado en px
+    n.classList.remove('show');
+    // Vaciamos el contenido recién cuando terminó la transición de salida, así no se
+    // desarma la caja delante de los ojos mientras todavía se está yendo.
+    this._hideTimer = setTimeout(() => {
+      if (!n.classList.contains('show')) { n.innerHTML = ''; updateToastPhase = null; }
+    }, 340);
+  },
+};
+let updateToastPhase = null;
+
+function utRow(icon, label, title, sub, closable) {
+  return (
+    `<div class="ut-row">` +
+      `<span class="ut-icon">${icon}</span>` +
+      `<div class="ut-content">` +
+        `<div class="ut-label">${label}</div>` +
+        `<div class="ut-title">${title}</div>` +
+        (sub ? `<div class="ut-sub">${sub}</div>` : '') +
+      `</div>` +
+      (closable ? `<button class="ut-close" data-ut="later" data-tip="Descartar">${UT_SVG.x}</button>` : '') +
+    `</div>`
+  );
+}
+
+function renderUpdate(status) {
+  const phase = status.phase;
+  const version = status.version ? escapeHtml(String(status.version)) : '';
+  const manual = !!status.manual;
+
+  // Descarga en curso: sólo movemos la barra, para que la transición de width no se corte.
+  if (phase === 'downloading' && updateToastPhase === 'downloading') {
+    const pct = Math.max(0, Math.min(100, Math.round(status.percent || 0)));
+    const bar = updateToast.node && updateToast.node.querySelector('.ut-progress-bar');
+    const num = updateToast.node && updateToast.node.querySelector('.ut-pct');
+    if (bar) bar.style.width = pct + '%';
+    if (num) num.textContent = pct + '%';
+    return;
+  }
+  updateToastPhase = phase;
+
+  switch (phase) {
+    case 'checking':
+      if (!manual) return; // auto-check: callado hasta que haya novedad
+      updateToast.render(utRow(UT_SVG.spin, 'Buscando', 'Buscando actualizaciones…', '', false));
+      break;
+    case 'available':
+      updateToast.render(
+        utRow(UT_SVG.rocket, 'Actualización', `ntermx <b>v${version}</b> disponible`, 'Hay una versión nueva lista para descargar.', true) +
+        `<div class="ut-actions">` +
+          `<button class="ut-btn primary" data-ut="download">Descargar</button>` +
+          `<button class="ut-btn ghost" data-ut="later">Después</button>` +
+        `</div>`
+      );
+      break;
+    case 'downloading': {
+      const pct = Math.max(0, Math.min(100, Math.round(status.percent || 0)));
+      updateToast.render(
+        utRow(UT_SVG.down, 'Descargando', `Bajando la actualización… <span class="ut-pct">${pct}%</span>`, '', false) +
+        `<div class="ut-progress"><div class="ut-progress-bar" style="width:${pct}%"></div></div>`
+      );
+      break;
+    }
+    case 'downloaded':
+      updateToast.render(
+        utRow(UT_SVG.check, 'Lista', `ntermx <b>v${version}</b> descargada`, 'Reiniciá para terminar de instalarla.', true) +
+        `<div class="ut-actions">` +
+          `<button class="ut-btn primary" data-ut="install">Reiniciar e instalar</button>` +
+          `<button class="ut-btn ghost" data-ut="later">Después</button>` +
+        `</div>`,
+        'ready'
+      );
+      break;
+    case 'none':
+      if (!manual) { updateToast.dismiss(); return; }
+      updateToast.render(utRow(UT_SVG.check, 'Al día', 'Ya tenés la última versión.', '', true), 'ready');
+      updateToast.autoDismiss(2800);
+      break;
+    case 'error':
+      if (!manual) { updateToast.dismiss(); return; }
+      updateToast.render(utRow(UT_SVG.alert, 'Falló', escapeHtml(status.error || 'No pude buscar actualizaciones.'), '', true), 'error');
+      updateToast.autoDismiss(4200);
+      break;
+    case 'sim-install':
+      updateToast.render(utRow(UT_SVG.restart, 'Instalando', 'Reiniciando para instalar… (simulado en dev)', '', false), 'ready');
+      updateToast.autoDismiss(2800);
+      break;
+  }
+}
+
+function initUpdates() {
+  // La versión de la status bar: se rellena async y entra con un fade (ver el .ready
+  // del CSS), y el click pide el chequeo a mano — manual=true, así también contesta
+  // cuando NO hay nada nuevo, que es justo lo que querés saber si lo pediste vos.
+  const vEl = document.getElementById('status-version');
+  if (vEl) {
+    window.app.getVersion()
+      .then((v) => { vEl.textContent = 'v' + v; vEl.classList.add('ready'); })
+      .catch(() => { /* sin versión, el item queda invisible y no molesta */ });
+    vEl.addEventListener('click', () => window.updater.check(true));
+  }
+
+  window.updater.onStatus(renderUpdate);
+
+  // Delegación de clicks del toast: descargar / instalar / descartar.
+  const toast = updateToast.node;
+  if (toast) {
+    toast.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-ut]');
+      if (!btn) return;
+      const act = btn.dataset.ut;
+      if (act === 'download') {
+        window.updater.download();
+        renderUpdate({ phase: 'downloading', percent: 0 }); // feedback inmediato al click
+      } else if (act === 'install') {
+        window.updater.install();
+      } else {
+        updateToast.dismiss();
+      }
+    });
+  }
 }

@@ -9,6 +9,25 @@ app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 
+// ---------------------------------------------------------------------------
+// Instancia única
+// ---------------------------------------------------------------------------
+// Sin el lock, cada doble click en el acceso directo levanta otra app entera: dos
+// trays, dos juegos de shells, dos ventanas. Con el atajo global es peor, porque
+// Ctrl+Alt+T lo da Windows en exclusiva: se lo queda la primera instancia y la
+// segunda falla al registrarlo. Si después se cierra la primera, su unregisterAll()
+// libera el atajo y la que sigue viva nunca lo tuvo — el atajo queda muerto sin que
+// se haya cerrado nada. Tiene que correr antes de whenReady().
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.exit(0);
+}
+
+// El segundo lanzamiento se mata solo, pero antes nos avisa: es el usuario haciendo
+// doble click para ver la app, así que la traemos al frente en vez de togglear (que
+// la escondería justo cuando la está pidiendo).
+app.on('second-instance', () => { revealWindow(); });
+
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -25,9 +44,19 @@ let ptyIdCounter = 0;
 /** Trae la ventana al frente esté oculta en el tray, minimizada o solo sin foco. */
 function revealWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
-  if (!mainWindow.isVisible()) mainWindow.show();
   if (mainWindow.isMinimized()) mainWindow.restore();
+  if (!mainWindow.isVisible()) mainWindow.show();
+
+  // Windows no deja que un proceso en background se robe el foreground, y cuando el
+  // disparo viene del atajo global el foreground es justamente OTRA app. show()+focus()
+  // a secas deja la ventana atrás o parpadeando en la barra de tareas; y como
+  // isFocused() se queda en false, el toggle nunca llega a la rama de esconder y cada
+  // Ctrl+Alt+T vuelve a "mostrar" una ventana que ya estaba ahí. Pasar por alwaysOnTop
+  // fuerza el z-order y la sube de verdad; lo bajamos en el acto para no dejarla
+  // clavada arriba de todo.
+  mainWindow.setAlwaysOnTop(true);
   mainWindow.focus();
+  mainWindow.setAlwaysOnTop(false);
 }
 
 /**
@@ -197,11 +226,19 @@ function toggleWindow() {
 // ---------------------------------------------------------------------------
 // Atajo global: Ctrl+Alt+T
 // ---------------------------------------------------------------------------
+const HOTKEY = 'CommandOrControl+Alt+T';
+
 function registerHotkeys() {
-  const ok = globalShortcut.register('CommandOrControl+Alt+T', toggleWindow);
+  // register() ya devuelve false si la combinación está tomada, pero lo confirmamos
+  // contra isRegistered(): lo único que importa es que quede efectivamente enganchada.
+  const ok = globalShortcut.register(HOTKEY, toggleWindow) && globalShortcut.isRegistered(HOTKEY);
   if (!ok) {
-    console.error('[NTERMX] no pude registrar Ctrl+Alt+T (¿lo tiene tomado otra app?)');
+    // En la app empaquetada nadie ve la consola, así que el fallo se cuenta también
+    // en el tray: si no, el atajo simplemente "no anda" y no hay forma de saber por qué.
+    console.error('[NTERMX] no pude registrar Ctrl+Alt+T: lo tiene tomado otra app.');
+    if (tray) tray.setToolTip('ntermx — Ctrl+Alt+T no disponible (lo tiene otra app)');
   }
+  return ok;
 }
 
 // ---- IPC: shells ----
@@ -246,12 +283,187 @@ ipcMain.on('window:close', () => {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close();
 });
 
+// ---------------------------------------------------------------------------
+// Auto-update (electron-updater)
+// ---------------------------------------------------------------------------
+// Sólo funciona en la app EMPAQUETADA: se apoya en el app-update.yml que genera
+// electron-builder y en el latest.yml del release de GitHub. En dev (npm start) no
+// existe ninguno de los dos, así que el check dispara una SIMULACIÓN del flujo entero
+// que emite los mismos 'update:status' que el camino real — sirve para ver y ajustar el
+// toast sin tener que publicar un release para probarlo.
+let _autoUpdater;            // instancia cacheada (lazy require; puede quedar null)
+let _updaterWired = false;   // listeners registrados una sola vez
+let updateManual = false;    // el check en curso lo pidió el usuario → feedback visible
+
+/** Envío defensivo al renderer: la ventana puede estar escondida en el tray o destruida. */
+function sendToRenderer(channel, payload) {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
+}
+
+function sendUpdate(phase, extra) {
+  sendToRenderer('update:status', { phase, manual: updateManual, ...(extra || {}) });
+}
+
+function getAutoUpdater() {
+  if (_autoUpdater !== undefined) return _autoUpdater;
+  try {
+    _autoUpdater = require('electron-updater').autoUpdater;
+    _autoUpdater.autoDownload = false;        // primero avisamos; el usuario decide
+    _autoUpdater.autoInstallOnAppQuit = true;
+    _autoUpdater.logger = { info: console.log, warn: console.warn, error: console.error, debug: () => {} };
+  } catch (err) {
+    console.error('[NTERMX] electron-updater no disponible:', err.message);
+    _autoUpdater = null;
+  }
+  return _autoUpdater;
+}
+
+function wireAutoUpdater(up) {
+  if (_updaterWired || !up) return;
+  _updaterWired = true;
+  up.on('checking-for-update', () => sendUpdate('checking'));
+  up.on('update-available',     (info) => sendUpdate('available', { version: info && info.version }));
+  up.on('update-not-available', () => sendUpdate('none'));
+  up.on('download-progress',    (p) => sendUpdate('downloading', { percent: Math.round((p && p.percent) || 0) }));
+  up.on('update-downloaded',    (info) => sendUpdate('downloaded', { version: info && info.version }));
+  up.on('error',                (err) => sendUpdate('error', { error: (err && err.message) || String(err) }));
+}
+
+// Simulación de dev: los mismos update:status que el camino real, movidos por timers.
+let simTimers = [];
+const SIM_VERSION = '9.9.9';
+function clearSim() { simTimers.forEach(clearTimeout); simTimers = []; }
+function simCheck() {
+  clearSim();
+  sendUpdate('checking');
+  simTimers.push(setTimeout(() => sendUpdate('available', { version: SIM_VERSION }), 950));
+}
+function simDownload() {
+  clearSim();
+  let pct = 0;
+  const tick = () => {
+    pct += 4 + Math.floor(Math.random() * 15);
+    if (pct >= 100) {
+      sendUpdate('downloading', { percent: 100 });
+      simTimers.push(setTimeout(() => sendUpdate('downloaded', { version: SIM_VERSION }), 450));
+      return;
+    }
+    sendUpdate('downloading', { percent: pct });
+    simTimers.push(setTimeout(tick, 240));
+  };
+  simTimers.push(setTimeout(tick, 200));
+}
+
+ipcMain.handle('update:check', (_e, opts) => {
+  updateManual = !!(opts && opts.manual);
+  if (!app.isPackaged) { simCheck(); return { simulated: true }; }
+  const up = getAutoUpdater();
+  if (!up) { sendUpdate('error', { error: 'El updater no está disponible.' }); return { ok: false }; }
+  wireAutoUpdater(up);
+  Promise.resolve(up.checkForUpdates()).catch((err) => sendUpdate('error', { error: err.message }));
+  return { ok: true };
+});
+
+ipcMain.handle('update:download', () => {
+  if (!app.isPackaged) { simDownload(); return { simulated: true }; }
+  const up = getAutoUpdater();
+  if (!up) return { ok: false };
+  Promise.resolve(up.downloadUpdate()).catch((err) => sendUpdate('error', { error: err.message }));
+  return { ok: true };
+});
+
+ipcMain.handle('update:install', () => {
+  if (!app.isPackaged) { console.log('[NTERMX] (dev sim) quitAndInstall'); sendUpdate('sim-install'); return { simulated: true }; }
+  const up = getAutoUpdater();
+  if (!up) return { ok: false };
+  // CRÍTICO: sin isQuitting = true el handler de 'close' esconde la ventana en el tray
+  // en vez de dejarla cerrar, y la instalación no corre nunca. Lo forzamos y salimos en
+  // el próximo tick.
+  isQuitting = true;
+  setImmediate(() => {
+    try { up.quitAndInstall(); } catch (e) { console.error('[NTERMX] quitAndInstall falló:', e.message); }
+  });
+  return { ok: true };
+});
+
+ipcMain.handle('app:version', () => app.getVersion());
+
+// --- Cache del updater ---
+// electron-updater deja el instalador montado en <cache>/pending para correrlo al salir
+// (autoInstallOnAppQuit). Una vez que la instalación se aplicó eso es peso muerto: ~100 MB
+// y un install pendiente que puede volver a dispararse. Lo borramos sólo si la versión
+// montada es <= la que estamos corriendo; si es MÁS nueva es un update legítimo esperando
+// el próximo quit, y ese no se toca.
+function updaterCacheDirName() {
+  // Fuente de verdad: el app-update.yml que genera electron-builder. Leerlo en vez de
+  // hardcodear el nombre evita que esto deje de limpiar en silencio si algún día cambia.
+  try {
+    const yml = fs.readFileSync(path.join(process.resourcesPath, 'app-update.yml'), 'utf8');
+    const m = yml.match(/^updaterCacheDirName:\s*(.+)$/m);
+    if (m) return m[1].trim();
+  } catch { /* en dev no existe */ }
+  return null;
+}
+
+function compareVersion(a, b) {
+  const pa = a.split('.').map(Number), pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d) return d;
+  }
+  return 0;
+}
+
+async function cleanStaleUpdaterCache() {
+  if (!app.isPackaged || !process.env.LOCALAPPDATA) return;
+  const dirName = updaterCacheDirName();
+  if (!dirName) return;
+  const pending = path.join(process.env.LOCALAPPDATA, dirName, 'pending');
+
+  let info;
+  try { info = JSON.parse(fs.readFileSync(path.join(pending, 'update-info.json'), 'utf8')); }
+  catch { return; }   // no hay nada montado: el caso normal
+
+  // artifactName es ${productName}-Setup-${version}.${ext} (package.json > build.nsis).
+  const m = String(info.fileName || '').match(/-Setup-(\d+\.\d+\.\d+)\.exe$/i);
+  if (!m) return;                                          // nombre inesperado: no tocamos
+  if (compareVersion(m[1], app.getVersion()) > 0) return;   // update legítimo pendiente
+
+  try {
+    await fs.promises.rm(pending, { recursive: true, force: true });
+    console.log(`[NTERMX] cache del updater limpiada (v${m[1]} ya está instalada)`);
+  } catch (err) {
+    console.error('[NTERMX] no pude limpiar la cache del updater:', err.message);
+  }
+}
+
 // ---- Ciclo de vida ----
 
 app.whenReady().then(() => {
+  // La instancia que pierde el lock ya salió por app.exit(0) allá arriba. Este corte es
+  // el cinturón sobre los tiradores: si por lo que sea llegara igual hasta acá, no
+  // queremos que fabrique ventana, tray, hotkeys ni shells de más justo antes de morir.
+  if (!gotTheLock) return;
+
   createWindow();
   createTray();
   registerHotkeys();
+  // Sin await: no es urgente y puede tardar borrando ~100 MB.
+  cleanStaleUpdaterCache();
+
+  // Chequeo automático al arrancar, sólo empaquetada. Va en silencio (updateManual =
+  // false): el toast no aparece salvo que haya de verdad una versión nueva. Los 4s son
+  // para no pelear con el arranque de las shells.
+  if (app.isPackaged) {
+    setTimeout(() => {
+      updateManual = false;
+      const up = getAutoUpdater();
+      if (!up) return;
+      wireAutoUpdater(up);
+      Promise.resolve(up.checkForUpdates())
+        .catch((err) => console.error('[NTERMX] el auto-check de updates falló:', err.message));
+    }, 4000);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

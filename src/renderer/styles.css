@@ -19,7 +19,9 @@
   --magenta:      var(--st-accent-alt);
   --magenta-glow: color-mix(in srgb, var(--st-accent-alt) 50%, transparent);
   --red:          var(--st-danger);
+  --red-glow:     color-mix(in srgb, var(--st-danger) 50%, transparent);
   --green:        var(--st-success);
+  --green-glow:   color-mix(in srgb, var(--st-success) 50%, transparent);
   --yellow:       var(--st-warning);
 
   --text:        var(--st-text);
@@ -228,7 +230,9 @@ html, body {
    así no queda la hilacha de 1px en las esquinas redondeadas. */
 #tooltip {
   position: fixed;
-  z-index: 500;
+  /* Por encima del toast de update (2000): si no, el tooltip del botón de descartar
+     salía por debajo de la propia caja del toast y no se veía. */
+  z-index: 3000;
   max-width: 280px;
   padding: 4px 9px;
   background: var(--bg-elevated);
@@ -381,3 +385,182 @@ html, body {
   90%  { opacity: .95; } 93%  { opacity: .98; } 96%  { opacity: .97; }
   100% { opacity: .98; }
 }
+
+/* ========== VERSIÓN EN LA STATUS BAR ========== */
+/* Click = buscar actualizaciones. Es un <button> de verdad (es un control, no una
+   etiqueta), así que le sacamos toda la apariencia nativa y le damos la nuestra. */
+#status-bar .version {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: var(--text-faint);
+  cursor: pointer;
+  border-radius: var(--st-radius-sm);
+  /* Arranca invisible: el texto llega async desde app.getVersion() y nada aparece de
+     golpe. renderer.js le pone .ready cuando ya tiene qué mostrar. */
+  opacity: 0;
+  transition:
+    opacity var(--st-dur-4) var(--st-ease-out),
+    color var(--st-dur-2) ease,
+    text-shadow var(--st-dur-2) ease,
+    box-shadow var(--st-dur-2) ease;
+}
+#status-bar .version.ready { opacity: 1; }
+#status-bar .version:hover { color: var(--cyan); text-shadow: var(--st-glow-text); }
+/* Anillo de foco propio, sólo por teclado — nunca el outline azul de Chromium. */
+#status-bar .version:focus-visible {
+  outline: none;
+  color: var(--cyan);
+  box-shadow: 0 0 0 1px var(--border-vivid), var(--st-glow-sm);
+}
+
+/* ========== UPDATE TOAST (auto-update) ========== */
+/* Un solo nodo arriba a la derecha que muta de fase (checking → available →
+   downloading → downloaded). Oculto = deslizado a la derecha + fade; .show lo trae.
+   El rail izquierdo y el glow son cyan, y viran a verde en "listo" y a rojo en error. */
+#update-toast {
+  position: fixed;
+  top: calc(var(--st-titlebar-h) + 12px);
+  right: 16px;
+  z-index: 2000;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  background: linear-gradient(180deg, var(--bg-elevated), var(--bg-panel));
+  border: 1px solid var(--border-soft);
+  border-left: var(--st-rail) solid var(--cyan);
+  border-radius: var(--st-radius-xl);
+  box-shadow: var(--st-shadow-float), var(--st-halo);
+  padding: 13px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  font-family: var(--font-sans);
+  /* Estado oculto: fuera a la derecha + desvanecido. */
+  opacity: 0;
+  transform: translateX(26px) scale(.98);
+  pointer-events: none;
+  transition:
+    opacity var(--st-dur-5) var(--st-ease-out),
+    transform var(--st-dur-5) var(--st-ease-out),
+    border-left-color .3s ease,
+    box-shadow .3s ease;
+}
+#update-toast.show { opacity: 1; transform: translateX(0) scale(1); pointer-events: auto; }
+#update-toast:empty { display: none; } /* sin contenido = sin caja fantasma */
+/* Mutación entre fases: sin esto la caja salta de alto en un frame, porque cada fase
+   reemplaza el contenido entero. El alto lo fija en px el render() (height:auto no
+   interpola) y acá lo interpolamos. overflow:hidden evita que el contenido asome
+   mientras la caja se achica. */
+#update-toast.morphing {
+  overflow: hidden;
+  transition:
+    height .26s var(--st-ease-out),
+    opacity var(--st-dur-5) var(--st-ease-out),
+    transform var(--st-dur-5) var(--st-ease-out),
+    border-left-color .3s ease,
+    box-shadow .3s ease;
+}
+/* El contenido nuevo entra con un fade corto en vez de aparecer de golpe. Se dispara
+   solo en cada render porque los nodos hijos se recrean. */
+#update-toast > * { animation: ut-content-in var(--st-dur-4) ease both; }
+@keyframes ut-content-in { from { opacity: 0; transform: translateY(-3px); } }
+#update-toast.ready {
+  border-left-color: var(--green);
+  box-shadow: var(--st-shadow-float), 0 0 22px color-mix(in srgb, var(--green) 18%, transparent);
+}
+#update-toast.error {
+  border-left-color: var(--red);
+  box-shadow: var(--st-shadow-float), 0 0 22px color-mix(in srgb, var(--red) 16%, transparent);
+}
+
+.ut-row { display: flex; align-items: flex-start; gap: 11px; }
+.ut-icon {
+  flex: none;
+  color: var(--cyan);
+  margin-top: 1px;
+  display: flex;
+  filter: var(--st-glow-icon);
+  transition: color .3s ease, filter .3s ease;
+}
+#update-toast.ready .ut-icon { color: var(--green); filter: drop-shadow(0 0 6px var(--green-glow)); }
+#update-toast.error .ut-icon { color: var(--red);   filter: drop-shadow(0 0 6px var(--red-glow)); }
+.ut-content { flex: 1; min-width: 0; }
+.ut-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: var(--st-track-label);
+  text-transform: uppercase;
+  color: var(--cyan);
+  margin-bottom: 3px;
+  transition: color .3s ease;
+}
+#update-toast.ready .ut-label { color: var(--green); }
+#update-toast.error .ut-label { color: var(--red); }
+/* El texto del toast es contenido real (versiones, mensajes de error): copiable. */
+.ut-title { font-size: 13px; color: var(--text); line-height: 1.4; user-select: text; }
+.ut-title b { font-family: var(--font-mono); color: var(--text); }
+.ut-sub { font-size: 11.5px; color: var(--text-dim); margin-top: 3px; line-height: 1.45; user-select: text; }
+.ut-pct { font-family: var(--font-mono); color: var(--cyan); }
+.ut-close {
+  flex: none;
+  width: 22px; height: 22px;
+  border-radius: var(--st-radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color var(--st-dur-2), border-color var(--st-dur-2);
+}
+.ut-close:hover { color: var(--red); border-color: var(--red); }
+
+/* Spinner del "buscando" */
+.ut-spin { animation: ut-spin .9s linear infinite; transform-origin: center; }
+@keyframes ut-spin { to { transform: rotate(360deg); } }
+
+/* Barra de progreso — el ancho transiciona suave a cada tick de descarga. */
+.ut-progress {
+  height: 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--bg-deep);
+  border: 1px solid var(--border-subtle);
+}
+.ut-progress-bar {
+  height: 100%;
+  width: 0;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--cyan-dim), var(--cyan));
+  box-shadow: 0 0 10px var(--cyan-glow);
+  transition: width .32s var(--st-ease-out);
+}
+
+/* Acciones */
+.ut-actions { display: flex; gap: 8px; }
+.ut-btn {
+  padding: 7px 14px;
+  border-radius: var(--st-radius-md);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: box-shadow var(--st-dur-2), background var(--st-dur-2), color var(--st-dur-2), border-color var(--st-dur-2);
+}
+.ut-btn.primary {
+  background: var(--cyan);
+  color: var(--st-on-accent);
+  box-shadow: var(--st-glow);
+}
+.ut-btn.primary:hover { box-shadow: var(--st-glow-lg); }
+#update-toast.ready .ut-btn.primary {
+  background: var(--green);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--green) 35%, transparent);
+}
+#update-toast.ready .ut-btn.primary:hover { box-shadow: 0 0 20px var(--green-glow); }
+.ut-btn.ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--st-edge); }
+.ut-btn.ghost:hover { color: var(--text); border-color: var(--text-dim); }

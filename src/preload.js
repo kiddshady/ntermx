@@ -39,6 +39,27 @@ contextBridge.exposeInMainWorld('app', {
     const listener = (_e, maximized) => cb(maximized);
     ipcRenderer.on('window:maximize-state', listener);
     return () => ipcRenderer.removeListener('window:maximize-state', listener);
+  },
+  // La versión que muestra la status bar. Sale de app.getVersion() y no de un require
+  // del package.json: empaquetada es la misma, pero getVersion es la fuente de verdad
+  // que también usa el updater para decidir si un release es más nuevo.
+  getVersion: () => ipcRenderer.invoke('app:version')
+});
+
+/**
+ * Auto-update. check(manual): manual=true → el usuario lo pidió, así que el toast
+ * muestra también los desenlaces aburridos ("estás al día", errores). Con manual=false
+ * el chequeo es silencioso y sólo habla si hay una versión nueva.
+ * onStatus recibe { phase, manual, version?, percent?, error? }.
+ */
+contextBridge.exposeInMainWorld('updater', {
+  check: (manual) => ipcRenderer.invoke('update:check', { manual: !!manual }),
+  download: () => ipcRenderer.invoke('update:download'),
+  install: () => ipcRenderer.invoke('update:install'),
+  onStatus: (cb) => {
+    const listener = (_e, payload) => cb(payload);
+    ipcRenderer.on('update:status', listener);
+    return () => ipcRenderer.removeListener('update:status', listener);
   }
 });
 

@@ -50,10 +50,16 @@
         <span class="cwd" id="status-cwd">~</span>
         <span class="spacer"></span>
         <span class="shell" id="status-shell">pwsh</span>
+        <!-- La versión la rellena renderer.js con app.getVersion(); click = buscar
+             actualizaciones. Arranca vacía y aparece con un fade cuando llega. -->
+        <button class="version" id="status-version" data-tip="Buscar actualizaciones"></button>
         <span class="time" id="status-time">--:--:--</span>
       </div>
     </div>
   </div>
+
+  <!-- UPDATE TOAST (auto-update) — el contenido lo arma renderer.js según la fase -->
+  <div id="update-toast" aria-live="polite"></div>
 
   <!-- CRT scanlines + vignette overlay (cubre toda la app) -->
   <div id="crt-overlay"></div>

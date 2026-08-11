@@ -11,7 +11,7 @@ and yellow neon palette with a CRT scanline vibe.
 - Loads your PowerShell profile as-is: your own prompt stays untouched. The
   shell init only *wraps* it to emit OSC 7, so the status bar can follow the cwd
 - Tabs: one PowerShell per tab (`Ctrl+Shift+T` new, `Ctrl+Shift+W` close,
-  `Ctrl+Tab` to cycle), up to 8
+  `Ctrl+Tab` to cycle), up to 4
 - Lives in the system tray and toggles with the global `Ctrl+Alt+T` hotkey —
   closing the window hides it, the shells keep running
 - **UTF-8 console.** ConPTY hands the shell a console that starts on the system
