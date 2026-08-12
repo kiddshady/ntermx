@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, globalShortcut, screen } = require('electron');
 
 // Mata el flash blanco intermitente al minimizar→restaurar (Win11). Cuando la ventana se
 // minimiza Windows la marca como ocluida; Chromium la manda a background y libera su
@@ -136,15 +136,34 @@ function spawnShell(cols = 80, rows = 24) {
   return { id, isPs7 };
 }
 
+const WIN_W = 1113;
+const WIN_H = 626;
+
 function createWindow() {
   const iconPath = path.join(__dirname, '..', 'build', 'icon.ico');
+
+  // Centrado a mano sobre el área útil del primario (descuenta la taskbar): abajo
+  // pasamos x/y explícitos para nacer off-screen, y eso desactiva el auto-centrado.
+  const { x: waX, y: waY, width: waW, height: waH } = screen.getPrimaryDisplay().workArea;
+  const winX = Math.max(waX, Math.round(waX + (waW - WIN_W) / 2));
+  const winY = Math.max(waY, Math.round(waY + (waH - WIN_H) / 2));
+
   mainWindow = new BrowserWindow({
-    width: 1113,
-    height: 626,
+    // El fondo gris del arranque es el frame que pinta el compositor de Windows cuando
+    // mapea el HWND en el primer show(), por encima del swap chain de Chromium: no lo
+    // tapa backgroundColor ni nada del contenido. No se puede evitar, pero sí correrlo
+    // a donde nadie lo vea. Nacemos a -20000px, mostramos ahí, y recién después la
+    // movemos al centro — aparece ya pintada con lo nuestro.
+    x: -20000,
+    y: -20000,
+    width: WIN_W,
+    height: WIN_H,
     minWidth: 520,
     minHeight: 360,
     title: 'ntermx',
-    backgroundColor: '#050507', // con Electron 40 esto tiñe el frame fantasma del compositor
+    show: false,
+    paintWhenInitiallyHidden: true, // que pinte el primer frame aunque esté oculta
+    backgroundColor: '#050507', // = --st-bg-deep, lo que se ve hasta que carga el CSS
     titleBarStyle: 'hidden',
     frame: false,
     autoHideMenuBar: true,
@@ -158,6 +177,19 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+
+  // ready-to-show = el renderer ya pintó su primer frame. El show() de acá es el que se
+  // come el gris del compositor, off-screen. Los 200 ms le dan tiempo al compositor a
+  // asentar la superficie antes de mover: moverla antes dispara un segundo gris, esta
+  // vez en el centro de la pantalla. Menos de 200 sale intermitente.
+  mainWindow.once('ready-to-show', () => {
+    const win = mainWindow;
+    if (!win || win.isDestroyed()) return;
+    win.show();
+    setTimeout(() => {
+      if (!win.isDestroyed()) win.setPosition(winX, winY);
+    }, 200);
+  });
 
   // El 'focus' del BrowserWindow capta todos los alt-tab / click en taskbar / restore
   // desde el tray, que el focus del DOM a veces se pierde en Windows (frameless + DWM).
