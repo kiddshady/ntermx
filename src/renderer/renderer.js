@@ -630,6 +630,24 @@ const updateToast = {
 };
 let updateToastPhase = null;
 
+// El porcentaje corre hasta el valor nuevo desde el que se ve, al paso de la barra
+// (.32s), en vez de saltar de a pedazos. Cada aviso retoma desde donde iba; sin
+// destello, que en un número que cambia varias veces por segundo titila.
+function rollPct(el, to) {
+  const st = el.__roll || (el.__roll = { cur: parseFloat(el.textContent) || 0, raf: 0 });
+  cancelAnimationFrame(st.raf);
+  const from = st.cur;
+  const start = performance.now();
+  const frame = (now) => {
+    if (!el.isConnected) return;
+    const k = 1 - Math.pow(1 - Math.min(1, (now - start) / 320), 3);
+    st.cur = from + (to - from) * k;
+    el.textContent = Math.round(st.cur) + '%';
+    if (k < 1) st.raf = requestAnimationFrame(frame);
+  };
+  st.raf = requestAnimationFrame(frame);
+}
+
 function utRow(icon, label, title, sub, closable) {
   return (
     `<div class="ut-row">` +
@@ -655,7 +673,7 @@ function renderUpdate(status) {
     const bar = updateToast.node && updateToast.node.querySelector('.ut-progress-bar');
     const num = updateToast.node && updateToast.node.querySelector('.ut-pct');
     if (bar) bar.style.width = pct + '%';
-    if (num) num.textContent = pct + '%';
+    if (num) rollPct(num, pct);
     return;
   }
   updateToastPhase = phase;

@@ -410,10 +410,12 @@ ipcMain.handle('update:install', () => {
   if (!up) return { ok: false };
   // CRÍTICO: sin isQuitting = true el handler de 'close' esconde la ventana en el tray
   // en vez de dejarla cerrar, y la instalación no corre nunca. Lo forzamos y salimos en
-  // el próximo tick.
+  // el próximo tick. (true, true): el instalador corre en silencio y ntermx vuelve a
+  // abrirse al terminar; sin argumentos aparecía el asistente del NSIS, una ventana
+  // que no pide nada.
   isQuitting = true;
   setImmediate(() => {
-    try { up.quitAndInstall(); } catch (e) { console.error('[NTERMX] quitAndInstall falló:', e.message); }
+    try { up.quitAndInstall(true, true); } catch (e) { console.error('[NTERMX] quitAndInstall falló:', e.message); }
   });
   return { ok: true };
 });
