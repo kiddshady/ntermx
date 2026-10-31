@@ -72,7 +72,7 @@
     "cyberpunk"
   ],
   "devDependencies": {
-    "electron": "44.5.1",
+    "electron": "44.10.1",
     "electron-builder": "^25.1.8"
   },
   "dependencies": {
